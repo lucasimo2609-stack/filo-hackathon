@@ -1,0 +1,57 @@
+{% extends "base.html" %}{% block title %}Trasporto {{ p.name }}{% endblock %}{% block body %}
+<p class="crumb"><a href="/trasporti">&larr; Trasporti</a></p>
+<header class="banner plain">
+  <div>
+    <div class="wl-top"><span class="kind">Pratica {{ r.id }}</span><span class="st {{ r.status }}">{{ label }}</span></div>
+    <h1>{{ p.name }} · {{ a.service }}</h1>
+    <p class="banner-facts"><span>{{ a.at }} presso {{ a.place }}</span><span>partenza da {{ p.address }}</span><span>tel. {{ p.phone }}</span></p>
+  </div>
+  <div class="banner-side"><span class="meta">Servizio</span><b>{{ s.name }}</b><span class="meta">{{ s.booking }} · {{ s.response }}</span></div>
+</header>
+{% set risposte = ev|selectattr('step', 'equalto', 'risposta servizio')|list %}
+{% if risposte %}{% set ult = risposte[-1] %}<div class="callout callout-info" role="status"><span class="callout-icon" aria-hidden="true">✓</span>
+  <div><b>Risposta ricevuta · {{ ult.ts[11:16] }}</b><div>{{ ult.text }}</div></div></div>
+{% elif r.status == 'attesa_servizio' %}<div class="callout" role="status"><span class="callout-icon" aria-hidden="true">…</span>
+  <div><b>In attesa della risposta di {{ s.name }}</b><div>Questa pagina si aggiorna da sola appena il servizio risponde.</div></div></div>{% endif %}
+{% set steps = [('attesa_servizio','Richiesta al servizio'),('attesa_paziente','Chiamata alla persona'),('confermato','Confermato')] %}
+<ol class="steps">{% for k,l in steps %}<li class="{{ 'now' if (r.status==k and k!='confermato') or (k=='attesa_paziente' and r.status=='richiamare') }} {{ 'done' if (r.status in ('attesa_paziente','richiamare','confermato','annullato') and loop.index==1) or (r.status in ('confermato','annullato') and loop.index==2) or (r.status=='confermato' and loop.index==3) }}">{{ l }}</li>{% endfor %}</ol>
+
+<div class="casegrid">
+<div class="stack">
+<div class="card"><h3>Storia della pratica</h3>
+{% for e in ev %}<div class="ev"><div class="meta">{{ e.ts[11:16] }} · {{ 'agente' if e.who=='agente' else e.who }} · {{ e.step }}</div><div>{{ e.text }}</div></div>{% else %}<p class="meta">Ancora niente.</p>{% endfor %}</div>
+<div class="card"><div class="cardhead"><h3>Messaggi mandati</h3><span class="count meta">{{ mails|length }}</span></div>
+{% for m in mails %}<details><summary>{{ m.ts[11:16] }} · a {{ m.recipient }} · {{ m.subject }}{% if m.sent_to %} · <b>{{ 'partita davvero' if '@' in m.sent_to and 'non riuscito' not in m.sent_to else m.sent_to }}</b>{% endif %}</summary><div style="white-space:pre-wrap" class="meta">{{ m.body }}</div>
+{% if m.ics %}<p><a href="/posta/{{ m.id }}/calendario.ics">Scarica l'evento</a></p>{% endif %}</details>{% else %}<p class="meta">Nessun messaggio ancora.</p>{% endfor %}</div>
+</div>
+
+<aside class="decide">
+{% if r.status == 'attesa_servizio' %}
+<div class="card"><h3>Risposta del servizio</h3>
+{% if posta.attivo and s.email == posta.servizio %}
+<p class="meta">La richiesta è partita per mail a <b>{{ s.email }}</b>. Filo controlla la casella ogni 15 secondi: appena il servizio risponde, la pratica va avanti da sola e l'agente chiama la persona.
+{% if posta.errore %}<br><span class="error">Lettura della casella non riuscita: {{ posta.errore }}</span>{% elif posta.ultimo %}<br>Ultimo controllo della casella: {{ posta.ultimo[11:19] }}.{% endif %}</p>
+<p class="meta">Se il servizio risponde al telefono, oppure la risposta non è chiara, registrala qui a mano:</p>
+{% else %}<p class="meta">Richiesta partita: registra qui la risposta di {{ s.name }}.</p>{% endif %}
+<form method="post" action="/trasporti/{{ r.id }}/risposta"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="esito" value="disponibile">
+<label for="pt">Orario di partenza proposto dal servizio</label><input id="pt" name="partenza" value="{{ pickup }}" pattern="[0-9]{1,2}:[0-9]{2}" style="max-width:140px">
+<p><button>Disponibile</button></p></form>
+<form method="post" action="/trasporti/{{ r.id }}/risposta"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="esito" value="non_disponibile">
+<button class="danger">Non disponibile: prova il servizio successivo</button></form></div>
+{% elif r.status in ('attesa_paziente','richiamare') %}
+<div class="card"><h3>Chiamata dell'agente alla persona</h3>
+
+<p class="meta">L'agente vocale chiama, verifica e registra: la pratica va avanti da sola.</p>
+{% if call %}<p><a class="btn wide" href="/chiamate/{{ call.id }}">L'agente sta chiamando: rispondi come {{ p.name }}</a></p>{% else %}
+<form method="post" action="/chiamate/nuova" style="margin:8px 0"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="kind" value="trasporto">
+<input type="hidden" name="ref_id" value="{{ r.id }}"><input type="hidden" name="patient_id" value="{{ p.id }}"><button>Fai chiamare l'agente vocale</button></form>{% endif %}
+<details><summary>Oppure registra a mano l'esito di una telefonata fatta da una persona</summary>
+<blockquote class="script">{{ script }}</blockquote>
+<div class="row">{% for v,l,cl in [('serve','Serve: conferma',''),('non_serve','Non serve: annulla','ghost'),('non_risponde','Non risponde','danger')] %}
+<form method="post" action="/trasporti/{{ r.id }}/chiamata"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="esito" value="{{ v }}"><button class="{{ cl }}">{{ l }}</button></form>{% endfor %}</div></details></div>
+{% elif r.status == 'confermato' %}<div class="flash">Trasporto confermato · partenza alle {{ r.pickup }}. Mail al servizio, evento in calendario alla famiglia.</div>
+{% elif r.status == 'annullato' %}<div class="flash">Pratica chiusa: il trasporto non serve. Il servizio è stato avvisato.</div>
+{% else %}<div class="error">Serve l'accettazione: {{ label }}. Vedi la storia qui accanto.</div>{% endif %}
+</aside>
+</div>
+{% endblock %}

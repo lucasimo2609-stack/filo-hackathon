@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block title %}Posti liberati{% endblock %}{% block body %}
+{% set ST = {'da_approvare': 'attesa_paziente', 'in_chiamata': 'attesa_paziente', 'esito': 'attesa_paziente', 'senza_esito': 'richiamare',
+             'accettato': 'confermato', 'errore': 'nessun_servizio'} %}
+<header class="pagehead">
+  <div><h1>Posti liberati</h1>
+  <p class="sub">Ordine fisso deciso in ospedale: prima la classe di priorità della ricetta (U, B, D, P), a parità cognome e poi nome.
+  Ogni chiamata parte solo dopo l'approvazione di una persona; dopo un rifiuto Filo prepara la proposta per il successivo, da approvare di nuovo.
+  Un posto ha una sola proposta aperta alla volta.</p></div>
+  <form method="post" action="/posti/disdetta-prova" data-attesa="Disdetta in arrivo..." data-conferma="Simulare una disdetta dal CUP? Si libera un posto e la proposta per il primo in lista arriva nel cruscotto."><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="ghost" title="Per la demo: come se il CUP avesse appena ricevuto una disdetta">Disdetta di prova</button></form>
+</header>
+<h2 class="listhead">Posti <span class="count">{{ rows|length }}</span></h2>
+<div class="stack">
+{% for s in rows %}
+<article class="card">
+<div class="cardhead"><h3>{{ s.service.replace('_', ' ')|capitalize }} · {{ s.at }} · {{ s.place }}</h3>
+<span class="st {{ 'confermato' if s.assigned_to else 'attesa_paziente' }}">{{ s.stato }}</span></div>
+<p class="meta">Posto {{ s.id }}, disdetto il {{ s.freed_at }}.</p>
+<div class="casegrid">
+<div><h4 class="listhead">Ordine dei candidati</h4>
+<table class="list-table"><tr><th class="num">#</th><th>Persona</th><th>Priorità</th><th>In lista dal</th><th>Per questo posto</th></tr>
+{% for w in s.ordine %}<tr><td class="mono num">{{ w.pos }}</td><td>{{ w.name }}</td><td class="mono">{{ w.priority }}</td><td class="mono">{{ w.since }}</td>
+<td>{% if w.offer %}<span class="st {{ ST.get(w.offer.status, 'annullato') }}">{{ w.stato }}</span>{% else %}<span class="meta">{{ w.stato }}</span>{% endif %}
+{% if w.offer and w.offer.calls %} <span class="meta">({{ w.offer.calls }} chiamat{{ 'a' if w.offer.calls == 1 else 'e' }})</span>{% endif %}
+{% if w.offer and w.offer.call_id and w.offer.status in ('in_chiamata', 'senza_esito', 'esito') %} <a href="/chiamate/{{ w.offer.call_id }}">chiamata</a>{% endif %}
+{% if w.offer and w.offer.status == 'in_chiamata' %}
+<details><summary class="small">Registra l'esito a mano</summary>
+<p class="small">Se la chiamata si è chiusa senza che Filo lo sapesse, o hai parlato tu con la persona.</p>
+<form method="post" action="/posti/{{ w.offer.id }}/esito" class="row"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<select name="scelta" aria-label="Esito"><option value="accetta">Ha accettato</option><option value="rifiuta">Ha rifiutato</option><option value="nessuna_risposta">Non ha risposto</option></select>
+<button class="ghost">Registra</button></form></details>{% endif %}
+{% if w.offer and w.offer.status == 'errore' %}
+<div class="row" style="margin-top:6px"><form method="post" action="/posti/{{ w.offer.id }}/riprova"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="ghost">Riprova a salvare</button></form>
+<form method="post" action="/posti/{{ w.offer.id }}/libera"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="danger">Libera e passa al successivo</button></form></div>{% endif %}
+</td></tr>
+{% else %}<tr><td colspan="5" class="empty">Nessuno in lista d'attesa per questo esame.</td></tr>{% endfor %}</table>
+<p class="small">La priorità è quella scritta sulla ricetta dal medico: Filo la legge e non la cambia.</p></div>
+<div><h4 class="listhead">Cosa è successo</h4>
+{% for e in s.eventi %}<div class="ev{{ ' al' if e.step.startswith('errore') else '' }}"><div class="meta">{{ e.ts }} · {{ e.step }} · {{ e.who }}</div><div>{{ e.text }}</div></div>
+{% else %}<p class="meta">Ancora niente: la proposta nasce alla prossima elaborazione.</p>{% endfor %}</div>
+</div></article>
+{% else %}<div class="card empty"><b>Nessun posto liberato.</b> Compaiono quando qualcuno disdice una visita.</div>{% endfor %}
+</div>
+{% endblock %}

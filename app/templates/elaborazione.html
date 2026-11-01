@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% block title %}Invii al cloud{% endblock %}{% block body %}
+{% include "_impostazioni_tabs.html" %}
+<p class="meta">Log dell'ultima elaborazione: cosa è rimasto in ospedale, cosa è uscito verso gli agenti Fastweb, cosa è tornato.</p>
+{% if not r %}<div class="card empty"><b>Nessuna elaborazione ancora.</b> Si avvia dal cruscotto con «Elabora le novità».</div>{% elif r.s.errore or r.s.bloccato %}
+<div class="error">Elaborazione <span class="mono">{{ r.id }}</span> {{ 'bloccata prima dell\'invio' if r.s.bloccato else 'interrotta' }}: {{ r.s.bloccato or r.s.errore }}. Nessun caso è stato cancellato.</div>{% else %}
+<p class="meta">Elaborazione <span class="mono">{{ r.id }}</span> avviata da {{ r.started_by }} alle {{ r.started_at }}, finita alle {{ r.finished_at }}</p>
+<div class="grid g3">
+<div class="zone osp"><h3>1 · In ospedale</h3>
+<p>{{ n_notes }} note lette con {{ r.s.estrazione|join(' + ') }}. Il testo libero non esce: solo voci di una lista chiusa.</p>
+<p>Controllo di anonimato: ogni pacchetto deve somigliare ad almeno <b>{{ k_min }}</b> persone del distretto, altrimenti si generalizza.</p></div>
+<div class="zone cloud"><h3>2 · Verso il cloud</h3>
+<p>{{ r.s.pacchetti }} pacchetti, ognuno con un codice usa e getta, mescolati e spediti a gruppi.</p>
+<p>Attestazione <b>{{ r.s.attestazione.mode }}</b>: {{ r.s.attestazione.detail }}</p></div>
+<div class="zone osp"><h3>3 · Di nuovo in ospedale</h3>
+<p>{{ r.s.risultati }} risposte · {{ r.s.errori }} errori · {{ r.s.scartate or 0 }} scartate · {{ r.s.a_mano or 0 }} da controllare a mano · {{ r.s.regola_locale or 0 }} tenuti da una regola locale · {{ r.s.non_rimandati or 0 }} non rimandati · {{ r.s.decisi_in_ospedale or 0 }} decisi in ospedale. Codici ricollegati solo qui. Controlli locali sulle risposte.</p>
+<p>Casi creati: {{ r.s.casi.segreteria }} accettazione, {{ r.s.casi.medico }} medico.</p></div>
+</div>
+<h2 class="listhead section">Controllo di anonimato <span class="count">{{ gates|length }}</span></h2>
+<div class="card flush"><table class="list-table"><tr><th>Persona</th><th>Agente</th><th>Persone simili (k)</th><th>Condizioni diverse tra loro (l)</th><th>Intervento</th></tr>
+{% for g in gates %}<tr><td>{{ g.name }}</td><td>{{ g.agent }}</td><td class="mono {{ 'ko' if g.k < k_min }}">{{ g.k }}</td><td class="mono">{{ g.l if g.l is not none else '-' }}</td><td>{{ g.generalized or 'nessuno' }}</td></tr>{% endfor %}</table>
+{% if user.role != 'medico' %}<p class="small">Solo la parte logistica: il clinico lo vede il medico.</p>{% endif %}</div>
+<h2 class="listhead section">Pacchetti usciti, esattamente come sono partiti <span class="count">{{ packets|length }}</span></h2>
+{% if hidden %}<p class="meta">{{ hidden }} pacchetti clinici di questa elaborazione non sono mostrati: li vede solo il medico.</p>{% endif %}
+<div class="grid g2">
+{% for pk in packets %}{% set res = results.get(pk.code) %}
+<div class="zone cloud"><div class="meta">gruppo {{ pk.batch + 1 }} · posizione {{ pk.seq + 1 }} · agente <b>{{ pk.agent }}</b> · {{ res.o.backend if res else pk.backend }}{% if res %} · {{ res.ms }} ms{% endif %}</div>
+<pre class="pk">{{ pk.payload|leggibile }}</pre>
+{% if res %}<div class="meta" style="margin-top:6px">Risposta:</div><pre class="pk">{{ res.o.risultato|leggibile }}</pre>{% endif %}</div>
+{% endfor %}</div>
+{% if recomp %}<h2 class="listhead section">Ricomposizione <span class="count">solo medico</span></h2>
+<div class="card flush"><table class="list-table"><tr><th>Codice</th><th>Agente</th><th>Persona</th></tr>
+{% for x in recomp %}<tr><td class="mono">{{ x.code }}</td><td>{{ x.agent }}</td><td>{{ x.name }}</td></tr>{% endfor %}</table>
+<p class="small">Codici nuovi a ogni elaborazione e diversi per agente. I pacchetti troppo riconoscibili non partono.</p></div>{% endif %}
+{% endif %}
+<h2 class="listhead section">Dove girano gli agenti</h2>
+<div class="card flush"><table class="list-table"><tr><th>Agente</th><th>Dove</th><th>Modello</th></tr>
+{% for n,a in agents.items() %}<tr><td>{{ n }}</td><td>{{ 'piattaforma FastwebAI Agents (riserva: API diretta)' if a.backend=='sim' else 'API diretta AI Factory' }}</td><td class="mono">{{ a.model }}</td></tr>{% endfor %}</table>
+<p class="small">Si cambia dal file .env (AGENT_*_BACKEND=sim e SIM_WF_*). Modelli ospitati in Italia, nella AI Factory Fastweb.</p></div>
+{% endblock %}

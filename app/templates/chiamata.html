@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% block title %}Chiamata {{ c.patient.name }}{% endblock %}{% block body %}
+<p class="crumb"><a href="/chiamate">&larr; Chiamate</a></p>
+<header class="banner plain">
+  <div>
+    <div class="wl-top"><span class="kind">Chiamata {{ c.id }}</span><span class="origin og-voce">{{ label }}</span></div>
+    <h1>{{ c.patient.name }}</h1>
+    <p class="banner-facts"><span>Nata/o nel {{ c.patient.birth_year }}</span>{% if c.ref and c.ref.appointment %}<span>{{ c.ref.appointment.service }} {{ c.ref.appointment.at }}</span>{% endif %}{% if c.ref and c.ref.service %}<span>servizio {{ c.ref.service.name }}</span>{% endif %}</p>
+  </div>
+</header>
+{% if voce_ko %}<div class="callout callout-warn" role="alert"><span class="callout-icon" aria-hidden="true">⚠</span>
+  <div><b>La voce non è collegata a questa copia di Filo</b><div>{{ voce_ko }} Il simulatore a testo funziona lo stesso.</div></div></div>{% endif %}
+<div id="call" data-cid="{{ c.id }}" data-csrf="{{ csrf }}" data-ended="{{ 1 if c.ended_at else 0 }}" class="casegrid">
+<div class="card"><h3>Conversazione</h3><div id="turni" class="turni"><p class="meta">Ancora nessuna battuta.</p></div>
+<h3 style="margin-top:18px">Cosa ha registrato Filo</h3><div id="eventi"></div></div>
+<aside class="decide stack">
+<div class="card"><h3>Avvia</h3>
+<p class="meta">L'agente si presenta come assistente automatico, chiede l'anno di nascita e solo dopo parla della visita. Se sente un segnale d'allarme dice di chiamare il 112 e avvisa il medico.</p>
+<div class="row">
+{% if eleven %}<button id="btn-voce" type="button">Avvia dal browser (voce)</button><button id="btn-stop" type="button" class="danger" hidden>Termina</button>{% endif %}
+{% if tel %}<form method="post" action="/chiamate/{{ c.id }}/telefono"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="ghost">Chiama il numero di prova</button></form>{% endif %}
+</div>
+<p id="voce-stato" class="meta" style="margin-top:8px">{% if not eleven %}Voce non configurata: usa il simulatore qui sotto.{% endif %}</p>
+</div>
+<div class="card"><h3>Simulatore a testo</h3>
+<p class="meta">Scrivi come se fossi la persona al telefono. Risponde lo stesso agente, con gli stessi controlli.</p>
+<form id="sim" class="row"><label for="sim-frase" class="sr-only">Frase</label><input id="sim-frase" name="frase" placeholder="Es. Sì, sono io" autocomplete="off" style="flex:1"><button>Invia</button></form>
+</div>
+<div class="card"><h3>Esito</h3><div id="esito" class="meta">In attesa.</div></div>
+</aside>
+</div>
+<script src="/static/vendor/elevenlabs-client-1.26.0.js"></script>
+<script src="/static/voce.js?v={{ V }}"></script>
+{% endblock %}

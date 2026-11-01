@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Log{% endblock %}{% block body %}
+{% include "_impostazioni_tabs.html" %}
+<p class="meta">Chi ha fatto cosa e chi ha aperto quale scheda, per il tuo ruolo. Non si può modificare dall'applicazione.</p>
+{% if appunti %}<section class="section">
+<h2 class="listhead">Appunti dell'agente <span class="count">{{ appunti|length }}</span></h2>
+<div class="card">{% for n in appunti %}<div class="ev"><div class="meta">{{ n.ts[11:16] }} · {{ n.patient }} · {% if n.link %}<a href="{{ n.link }}">{{ n.ref }}</a>{% else %}{{ n.ref }}{% endif %}</div><div>{{ n.text }}</div></div>{% endfor %}</div>
+</section>{% endif %}
+<div class="grid g2 section">
+<div><h2 class="listhead">Azioni <span class="count">{{ act|length }}</span></h2><div class="card flush"><table class="list-table"><tr><th>Quando</th><th>Chi</th><th>Cosa</th></tr>
+{% for a in act %}<tr><td class="mono">{{ a.ts[11:16] }}</td><td>{{ a.username }}</td><td>{{ a.text }}</td></tr>{% else %}<tr><td colspan="3" class="empty">Nessuna azione.</td></tr>{% endfor %}</table></div></div>
+<div><h2 class="listhead">Accessi <span class="count">{{ acc|length }}</span></h2><div class="card flush"><table class="list-table"><tr><th>Quando</th><th>Chi</th><th>Cosa</th></tr>
+{% for a in acc %}<tr><td class="mono">{{ a.ts[11:16] }}</td><td>{{ a.username }}</td><td>{{ a.action }}{% if a.target %} · {{ a.target }}{% endif %}</td></tr>{% else %}<tr><td colspan="3" class="empty">Nessun accesso.</td></tr>{% endfor %}</table></div></div>
+</div>{% endblock %}

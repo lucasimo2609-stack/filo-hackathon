@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block title %}Accesso{% endblock %}{% block messages %}{% endblock %}{% block body %}
+<div class="login-top"><div class="lockup"><h1><img class="logo-filo" src="/static/logo-filo.png?v={{ V }}" alt="Filo" width="1084" height="505"></h1><p class="tagline">Ricuce le distanze.</p></div></div>
+<div class="login card">
+{% set NOTA_RUOLO = {"segreteria": "Entri come Marta Bianchi, accettazione.", "medico": "Entri come Elena Gatti, medico."} %}
+<p class="sub" id="nota-ruolo" aria-live="polite">{{ NOTA_RUOLO.get(role, NOTA_RUOLO.segreteria) }}</p>
+{% if flash %}<div class="flash" role="status">{{ flash }}</div>{% endif %}{% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+<form method="post" action="/login" autocomplete="off">
+<input type="hidden" name="csrf_token" value="{{ csrf }}">
+<fieldset class="bare"><legend class="sr-only">Ruolo</legend>
+<div class="roles"><label><input type="radio" name="role" value="segreteria" data-nota="{{ NOTA_RUOLO.segreteria }}" {{ 'checked' if role=='segreteria' }}>Accettazione</label>
+<label><input type="radio" name="role" value="medico" data-nota="{{ NOTA_RUOLO.medico }}" {{ 'checked' if role=='medico' }}>Medico</label></div></fieldset>
+<button autofocus>Avanti</button>
+<p class="small">Versione dimostrativa: si entra con gli utenti di prova {{ UTENTI_DEMO.segreteria }} ed {{ UTENTI_DEMO.medico }}, senza password. La firma del medico chiede ancora il codice dell'app di autenticazione.</p>
+</form>
+</div>{% endblock %}

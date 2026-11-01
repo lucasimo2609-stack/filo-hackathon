@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}Pazienti{% endblock %}{% block body %}
+<header class="pagehead">
+  <div><h1>Pazienti e documenti</h1>
+  <p class="sub">{{ total }} pazienti. Ogni apertura di una cartella finisce nel registro accessi.</p></div>
+  <a class="btn" href="/importa">Importa documenti</a>
+</header>
+{% if n_inbox %}<div class="callout callout-warn" role="note"><span class="callout-icon" aria-hidden="true">⚠</span>
+  <div><b>{{ n_inbox }} documenti senza paziente</b><div>Importati ma non attribuiti a nessuno: <a href="/importa#smistare">da smistare</a>.</div></div></div>{% endif %}
+<form method="get" action="/pazienti" class="searchbar" role="search"><label for="q" class="sr-only">Cerca</label>
+  <input id="q" name="q" type="search" value="{{ q }}" placeholder="Cerca per nome o codice fiscale"><button class="ghost">Cerca</button>{% if q %}<a href="/pazienti">Tutti</a>{% endif %}</form>
+<h2 class="listhead">{{ 'Risultati' if q else 'Elenco' }} <span class="count">{{ pts|length }}</span></h2>
+<div class="card flush"><table class="list-table">
+<tr><th>Paziente</th><th>Codice fiscale</th><th class="num">Età</th><th>Medico di famiglia</th><th class="num">Documenti</th><th>Ultimo</th><th>Da firmare</th></tr>
+{% for p in pts %}<tr><td><a href="/pazienti/{{ p.id }}">{{ p.name }}</a>{% if p.origin != 'anagrafe' %} <span class="pill imp">importato</span>{% endif %}</td><td class="mono">{{ p.cf }}</td><td class="num">{{ p.age }}</td><td>{{ p.mmg }}</td><td class="num">{{ p.n_docs }}</td><td class="mono">{{ p.last or '–' }}</td>
+<td>{% if p.open %}<span class="pill warn">{{ p.open }}</span>{% else %}<span class="meta">–</span>{% endif %}</td></tr>
+{% else %}<tr><td colspan="7" class="empty">Nessun paziente trovato.</td></tr>{% endfor %}</table></div>
+{% if pts|length == 200 %}<p class="small">Mostrati i primi 200: usa la ricerca.</p>{% endif %}
+{% endblock %}

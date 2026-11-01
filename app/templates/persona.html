@@ -1,0 +1,82 @@
+{% extends "base.html" %}{% block title %}{{ p.name }}{% endblock %}{% block body %}
+<header class="persona-head">
+  <div><span class="tag">Scheda della persona</span><h1>{{ p.name }}</h1>
+  <p class="banner-facts"><span>{{ age }} anni</span>{% if p.quartiere %}<span>{{ p.quartiere }}{% if p.distretto %}, distretto {{ p.distretto }}{% endif %}</span>{% endif %}
+  {% if user.role == 'segreteria' and p.phone %}<span>tel. {{ p.phone }}</span>{% endif %}{% if p.contatto %}<span>contatto: {{ p.contatto }}</span>{% endif %}</p>
+  {% if q.kit_info.serve %}<p class="kit-flag"><span class="pill imp">Serve il kit per l'udito</span> <span class="meta">{{ q.kit_info.stato }}</span></p>{% endif %}</div>
+  {% if q.prossima %}<div class="card" style="margin:0;padding:10px 14px"><span class="tag">Prossima visita</span>
+  <div><b>{{ q.prossima.service }}</b></div><div class="meta">{{ q.prossima.at[8:10] }}/{{ q.prossima.at[5:7] }} alle {{ q.prossima.at[11:16] }} · {{ q.prossima.place }}</div></div>{% endif %}
+</header>
+<nav class="tabs" aria-label="Sezioni di {{ p.name }}">{% for k, label in sezioni %}<a href="/persona/{{ p.id }}{{ '' if k == 'panoramica' else '/' ~ k }}" data-dentro class="{{ 'on' if sezione == k }}"{% if sezione == k %} aria-current="page"{% endif %}>{{ label }}{% if q.conteggi.get(k) %} <span class="count">{{ q.conteggi[k] }}</span>{% endif %}</a>{% endfor %}
+{% if user.role == 'medico' %}<a href="/pazienti/{{ p.id }}">Cartella</a>{% endif %}</nav>
+
+{% if sezione == 'panoramica' %}
+<div class="grid g2">
+<div class="stack">
+<div class="card"><h3>Da fare per {{ p.name.split(' ')[0] }}{% if q.aperti %} <span class="count">{{ q.aperti|length }}</span>{% endif %}</h3>
+{% for c in q.aperti %}<div class="riga"><span><b>{{ KIND_LABEL.get(c.kind, c.kind) }}</b><br><span class="meta">{{ c.summary }}</span></span><a class="btn" href="/caso/{{ c.id }}">Apri</a></div>
+{% else %}<p class="meta">Niente da decidere adesso.</p>{% endfor %}</div>
+{% if q.trasporti %}{% set t = q.trasporti[0] %}<div class="card"><h3>Trasporto</h3>
+<div class="riga"><span>{{ t.visit }} · {{ t.at[8:10] }}/{{ t.at[5:7] }} {{ t.at[11:16] }}<br><span class="meta">{{ t.service }}</span></span><span class="st {{ t.status }}">{{ t.label }}</span></div>
+<p><a href="/trasporti/{{ t.id }}">Apri la pratica</a>{% if q.trasporti|length > 1 %} · <a href="/persona/{{ p.id }}/trasporti">tutti i trasporti</a>{% endif %}</p></div>{% endif %}
+{% set k = q.kit_info %}{% if k.serve %}<div class="card"><h3>Kit per la visita accessibile</h3>
+<div class="riga"><span>Perché</span><span>{% if k.fonte %}«{{ k.fonte.snippet }}»{% if k.fonte.title %} <span class="meta">({{ k.fonte.title }}{% if k.fonte.date %}, {{ k.fonte.date[8:10] }}/{{ k.fonte.date[5:7] }}{% endif %})</span>{% endif %}{% else %}supporto per l'udito segnato in anagrafica{% endif %}</span></div>
+<div class="riga"><span>A che punto è</span><span>{{ k.stato }}</span></div>
+{% if k.caso %}<p><a class="btn" href="/caso/{{ k.caso }}">Riserva il kit</a></p>{% endif %}
+{% for b in k.prenotazioni %}<div class="riga"><span>{{ b.label or 'nessun kit libero' }} · {{ b.service or '' }} {{ b.at[8:10] }}/{{ b.at[5:7] }} {{ b.at[11:16] }}</span><span class="st {{ 'confermato' if b.status == 'riservato' else 'annullato' }}">{{ b.status }}</span></div>{% endfor %}
+{% for v in k.visite %}<div class="riga"><span>Visita col kit {{ v.started_at[8:10] }}/{{ v.started_at[5:7] }}{% if v.note_id and user.role == 'medico' %} · <a href="/pazienti/{{ p.id }}?doc={{ v.note_id }}">trascrizione</a>{% endif %}</span><span class="meta">{{ 'mandata a ' ~ v.sent_to if v.sent_to else v.status }}</span></div>{% endfor %}
+</div>{% endif %}
+{% if q.decisi %}<details class="card"><summary>Già decisi ({{ q.decisi|length }})</summary>
+{% for c in q.decisi %}<div class="riga"><a href="/caso/{{ c.id }}">{{ KIND_LABEL.get(c.kind, c.kind) }}</a><span class="meta">{{ (c.decided_at or '')[:16] }}</span></div>{% endfor %}</details>{% endif %}
+</div>
+<div class="card"><h3>Cosa è successo</h3>
+{% for e in q.storia %}<div class="ev"><div class="meta">{{ e.ts[8:10] }}/{{ e.ts[5:7] }} {{ e.ts[11:16] }} · {{ e.who }}</div><div class="small">{{ e.text }}</div></div>
+{% else %}<p class="meta">Ancora niente.</p>{% endfor %}</div>
+</div>
+
+{% elif sezione == 'trasporti' %}
+<div class="stack">{% for t in q.trasporti %}<article class="card"><div class="cardhead"><h3>{{ t.visit }} · {{ t.at[8:10] }}/{{ t.at[5:7] }} {{ t.at[11:16] }}</h3><span class="st {{ t.status }}">{{ t.label }}</span></div>
+<p class="meta">{{ t.service }}{% if t.pickup %} · partenza {{ t.pickup }}{% endif %} · <a href="/trasporti/{{ t.id }}">apri la pratica {{ t.id }}</a></p>
+{% for e in t.eventi[-6:] %}<div class="ev"><div class="meta">{{ e.ts[11:16] }} · {{ e.step }} · {{ e.who }}</div><div class="small">{{ e.text }}</div></div>{% endfor %}</article>
+{% else %}<div class="card empty"><b>Nessun trasporto per {{ p.name.split(' ')[0] }}.</b> Nasce dal via libera dell'accettazione su una visita a rischio.</div>{% endfor %}</div>
+
+{% elif sezione == 'calendario' %}
+<div class="stack">{% for v in q.visite %}{% set futura = v.status == 'prenotata' and v.at >= TODAY %}
+<article class="card"><div class="cardhead"><h3>{{ v.service }}</h3><span class="st {{ 'confermato' if v.status == 'prenotata' else 'annullato' }}">{{ v.status }}</span></div>
+<p><b>{{ ['lunedì','martedì','mercoledì','giovedì','venerdì','sabato','domenica'][v.at[:10]|weekday] }} {{ v.at[8:10] }}/{{ v.at[5:7] }} alle {{ v.at[11:16] }}</b> · {{ v.place }}</p>
+{% set kb = q.kit_info.per_visita.get(v.id) %}{% if kb and kb.status == 'riservato' %}<p class="note">Kit: {{ kb.label }} riservato e richiesto al coordinamento ambulatori.</p>
+{% elif q.kit_info.serve and futura %}<p class="note">Serve il kit per l'udito: {{ 'da riservare, serve il via libera' if q.kit_info.caso else 'non ancora riservato' }}.</p>{% endif %}
+{% if futura and user.role == 'segreteria' %}<div class="row">
+<details><summary class="btn ghost">Non può venire</summary>
+<form method="post" action="/calendario/disdetta" class="stack" style="gap:8px;margin-top:10px" data-conferma="Annullare la prenotazione di {{ p.name }} e passare il posto alla lista d'attesa?">
+<input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="prenotazione" value="{{ v.id }}"><input type="hidden" name="torna" value="/persona/{{ p.id }}/calendario">
+<label class="meta">Cosa ha detto (facoltativo)</label><input name="motivo" maxlength="200">
+<button>Registra la disdetta</button><p class="small">Il posto passa subito alla lista d'attesa e arriva l'avviso con chi può prenderlo.</p></form></details>
+<details><summary class="btn ghost">Sposta o annulla</summary>
+<form method="post" action="/calendario/modifica" class="stack" style="gap:8px;margin-top:10px">
+<input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="prenotazione" value="{{ v.id }}"><input type="hidden" name="torna" value="/persona/{{ p.id }}/calendario"><input type="hidden" name="posto" value="">
+<label class="meta">Cosa</label><select name="azione"><option value="sposta">Sposta al primo posto libero adatto</option><option value="annulla">Annulla</option></select>
+<label class="meta">Motivo (lo sentono ambulatorio e paziente)</label><input name="motivo" maxlength="300" required>
+<button>Proponi la modifica</button><p class="small">Non cambia subito: si tiene il posto, si avvisa l'ambulatorio, poi si chiama {{ p.name.split(' ')[0] }} per la conferma.</p></form></details>
+</div>{% endif %}</article>
+{% else %}<div class="card empty"><b>Nessuna visita in calendario.</b></div>{% endfor %}
+{% if q.modifiche %}<div class="card"><h3>Modifiche alle prenotazioni</h3>{% for m in q.modifiche %}<div class="riga"><span>{{ m.tipo }} · {{ m.motivo }}</span><span class="meta">{{ m.status }}</span></div>{% endfor %}</div>{% endif %}
+</div>
+
+{% elif sezione == 'posti' %}
+<div class="grid g2">
+<div class="card"><h3>Liste d'attesa</h3>{% for w in q.attesa %}<div class="riga"><span><b>{{ w.service.replace('_', ' ') }}</b><br><span class="meta">priorità {{ w.priority }} · in lista dal {{ w.since[8:10] }}/{{ w.since[5:7] }}</span></span><span class="meta">{{ w.status }}</span></div>
+{% else %}<p class="meta">Non è in nessuna lista d'attesa.</p>{% endfor %}</div>
+<div class="card"><h3>Posti liberati proposti a {{ p.name.split(' ')[0] }}</h3>{% for o in q.proposte %}<div class="riga"><span>{{ o.service }} · {{ o.at[8:10] }}/{{ o.at[5:7] }} {{ o.at[11:16] }}<br><span class="meta">{{ o.place }}</span></span>
+<span>{% if o.case_id %}<a href="/caso/{{ o.case_id }}">{{ o.status }}</a>{% else %}{{ o.status }}{% endif %}</span></div>
+{% else %}<p class="meta">Nessun posto proposto.</p>{% endfor %}</div></div>
+
+{% elif sezione == 'chiamate' %}
+<div class="card">{% for c in q.chiamate %}<div class="riga"><span><a href="/chiamate/{{ c.id }}"><b>{{ c.kind }}</b></a><br><span class="meta">{{ c.created_at[8:10] }}/{{ c.created_at[5:7] }} {{ c.created_at[11:16] }}</span></span><span class="meta">{{ c.status }}</span></div>
+{% else %}<p class="meta">Nessuna chiamata a {{ p.name.split(' ')[0] }}.</p>{% endfor %}</div>
+
+{% elif sezione == 'posta' %}
+<div class="card">{% for m in q.posta %}<div class="riga"><span><b>{{ m.subject }}</b><br><span class="meta">a {{ m.recipient }}{% if m.sent_to %} · partita davvero{% endif %}</span></span><span class="meta">{{ m.ts[8:10] }}/{{ m.ts[5:7] }} {{ m.ts[11:16] }}</span></div>
+{% else %}<p class="meta">Nessuna mail che riguarda {{ p.name.split(' ')[0] }}.</p>{% endfor %}</div>
+{% endif %}
+{% endblock %}

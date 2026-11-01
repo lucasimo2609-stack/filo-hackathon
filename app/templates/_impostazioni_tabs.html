@@ -1,0 +1,3 @@
+<header class="pagehead"><div><h1>Impostazioni</h1>
+<p class="sub">{{ user.name }} · {{ ROLE_LABEL[user.role] }}</p></div></header>
+<nav class="tabs" aria-label="Sezioni delle impostazioni"><a href="/impostazioni" class="{{ 'on' if tab=='profilo' }}"{% if tab=='profilo' %} aria-current="page"{% endif %}>Profilo e aspetto</a><a href="/impostazioni/log" class="{{ 'on' if tab=='log' }}"{% if tab=='log' %} aria-current="page"{% endif %}>Log</a><a href="/impostazioni/invii" class="{{ 'on' if tab=='invii' }}"{% if tab=='invii' %} aria-current="page"{% endif %}>Invii al cloud</a></nav>

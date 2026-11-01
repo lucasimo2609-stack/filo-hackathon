@@ -1,0 +1,69 @@
+{% extends "base.html" %}{% block title %}{{ p.name }}{% endblock %}{% block body %}
+{% set lv = level_of(c) %}{% set og = origine(c) %}
+<p class="crumb"><a href="/cruscotto">&larr; {{ 'Da firmare' if user.role=='medico' else 'Cruscotto' }}</a></p>
+
+<section class="banner lv-{{ lv.key }}">
+  <div class="prio" title="Priorità {{ lv.label|lower }}: {{ lv.hint }}{% if lv.raised %} (alzata da una regola fissa){% endif %}"><span class="prio-label"><span class="prio-sym" aria-hidden="true">{{ lv.symbol }}</span> {{ lv.label }}</span><span class="prio-score" aria-label="punteggio {{ c.score }} su 100">{{ c.score }}</span><span class="sr-only">Priorità: {{ lv.label|lower }}</span></div>
+  <div class="banner-main">
+    <div class="wl-top"><span class="kind">{{ c.tag }}</span><span class="origin og-{{ og.key }}" title="{{ og.hint }}">{{ og.label }}</span>{% if c.since %}<span class="when">segnalato {{ c.since|fa }}</span>{% endif %}</div>
+    <h1>{{ p.name }}</h1>
+    <p class="banner-facts"><span>Nato nel {{ p.birth_year }}</span><span>{{ p.address }}{% if p.quartiere %} ({{ p.quartiere }}){% endif %}</span>{% if p.distretto %}<span>distretto {{ p.distretto }}</span>{% endif %}{% if p.phone %}<span>tel. {{ p.phone }}</span>{% endif %}{% if p.mmg %}<span>MMG {{ p.mmg }}</span>{% endif %}</p>
+  </div>
+</section>
+<div class="casegrid">
+<div>
+<div class="card"><h3>Cosa succede</h3><p class="lead">{{ c.summary }}</p>
+<h3>Proposta</h3><p>{{ c.action }}</p>
+{% if c.role_note %}<div class="note">{{ c.role_note }}</div>{% endif %}</div>
+<div class="card"><h3>Perché questa priorità</h3>
+<div class="bar">{% for n,v in parts %}<span style="width:{{ v*100/(tot or 1) }}%" title="{{ n }} {{ v }}"></span>{% endfor %}</div>
+<table class="parts">{% for n,v in parts %}<tr><td><span class="sw sw{{ loop.index }}" aria-hidden="true"></span>{{ n }}</td><td class="mono">{{ v }}</td></tr>{% endfor %}
+<tr class="total"><td>Totale</td><td class="mono">{{ c.score }}/100</td></tr></table>
+{% if val %}<p class="small"><b>Valutazione del medico a fine visita</b> ({{ val.at[:16] }}, {{ val.doctor }}): urgenza {{ URGENCY[val.urgency]|lower }}{% if val.labels %}, per: {{ val.labels|join('; ') }}{% endif %}.{% if val.note %} Nota: {{ val.note }}{% endif %} <a href="/pazienti/{{ c.patient_id }}#valutazione">cambia</a></p>
+{% elif user.role == 'medico' %}<p class="small">Nessuna valutazione di fine visita per questo paziente: <a href="/pazienti/{{ c.patient_id }}#valutazione">registrala nella cartella</a>.</p>{% endif %}
+<p class="small">Punteggio calcolato in ospedale, con regole fisse.</p></div>
+<div class="card"><h3>Prove</h3>
+{% for e in ev %}<div class="ev"><div class="meta"><span class="mono">{{ e[0] }}</span> · {{ e[1] }}{% if user.role=='medico' and e[0].startswith('E-') %} · <a href="/pazienti/{{ c.patient_id }}?doc={{ e[0] }}">apri nella cartella</a>{% endif %}</div><div>{{ e[2] }}</div></div>{% endfor %}
+{% if user.role=='medico' %}<p><a class="btn ghost" href="/pazienti/{{ c.patient_id }}">Tutti i documenti del paziente</a></p>{% endif %}
+</div>
+</div>
+<div class="decide">
+{% if c.status == 'pending' %}
+<div class="card"><h3>{{ 'Firma e invia' if user.role=='medico' else 'Approva' }}</h3>
+<form method="post" action="/caso/{{ c.id }}/approva" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="torna" value="{{ c.id }}">
+{% if user.role=='medico' %}<label for="code">Codice a tempo per firmare</label>
+<input id="code" name="code" class="otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code">{% endif %}
+<p><button>{{ 'Firma' if user.role=='medico' else ('Via libera: parte la richiesta' if c.kind=='trasporto' else ('Approva questa chiamata' if c.kind in ('posto', 'modifica') else 'Approva ed esegui')) }}</button></p></form>
+<details><summary>Scarta la segnalazione</summary>
+<form method="post" action="/caso/{{ c.id }}/scarta" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<label for="tipo">Perché la scarti</label><select id="tipo" name="tipo" required><option value="">Scegli un motivo</option>{% for m in SCARTO %}<option>{{ m }}</option>{% endfor %}</select>
+<label for="motivo">Dettaglio (facoltativo, finisce nel registro)</label><input id="motivo" name="motivo" maxlength="300">
+{% if user.role=='medico' %}<label>Codice a tempo (scartare una segnalazione clinica pesa quanto firmarla)</label>
+<input name="code" class="otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code">{% endif %}
+<p><button class="danger">Scarta</button></p></form></details>
+</div>
+{% else %}{% if c.kind == 'posto' and c.status == 'ok' %}<div class="card"><h3>Proponi il posto</h3><p class="meta">La chiamata approvata è pronta: si avvia dalla sua pagina. Ordine dei candidati e storia dei tentativi in Posti liberati.</p>
+<div class="row">{% if c.payload and '"call"' in c.payload %}<a class="btn" href="/chiamate/{{ (c.payload|fromjson).call }}">Apri la chiamata</a>{% endif %}<a class="btn ghost" href="/posti">Posti liberati</a></div></div>{% endif %}
+{% if c.kind == 'modifica' and c.status == 'ok' and c.payload and '"call"' in c.payload %}<div class="card"><h3>Chiama il paziente</h3><p class="meta">La chiamata approvata è pronta: si avvia dalla sua pagina.</p>
+<a class="btn" href="/chiamate/{{ (c.payload|fromjson).call }}">Apri la chiamata</a></div>{% endif %}
+{% if c.kind in ('modifica_errore',) %}<div class="card"><a class="btn" href="/calendario">Vai al Calendario</a></div>{% endif %}
+{% if c.kind == 'posto_errore' %}<div class="card"><a class="btn" href="/posti">Vai a Posti liberati</a></div>{% endif %}
+<div class="card"><span class="{{ 'ok' if c.status=='ok' else 'ko' }}">{{ {'ok': 'Fatto', 'scartato': 'Scartato', 'superato': 'Superato (non più segnalato dall\'ultima elaborazione)', 'in_corso': 'In esecuzione'}.get(c.status, c.status) }}</span> da {{ c.decided_by }} il {{ c.decided_at }}</div>{% endif %}
+{% if altri %}<div class="card also" id="anche"><div class="cardhead"><h3>Per {{ p.name.split(' ')[0] }} c'è anche</h3><span class="listhead"><span class="count">{{ altri|length }}</span></span></div>
+{% for i in altri %}{% set ilv = level_of(i) %}{% set pl = i.payload|fromjson if i.payload else {} %}
+<div class="todo lv-{{ ilv.key }}"><div class="proposal"><span>{{ i.tag }}</span> <span class="prio-chip">{{ ilv.label }} · {{ i.score }}</span>
+<div class="reason">{{ i.summary }}</div><div>{{ i.action }}</div></div>
+{% if user.role == 'segreteria' %}<form method="post" action="/caso/{{ i.id }}/approva"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="torna" value="{{ c.id }}">
+<button>{{ {'trasporto': 'Via libera' if pl.get('service') else 'Prendo in carico', 'kit': 'Riserva il kit', 'posto': 'Approva la chiamata'}.get(i.kind, 'Approva') }}</button></form>
+{% else %}<a class="btn" href="/caso/{{ i.id }}">Verifica e firma</a>{% endif %}
+</div>{% endfor %}</div>{% endif %}
+{% if user.role == 'medico' and c.kind in ('aderenza', 'cure', 'esito_chiamata', 'allarme') %}<div class="card"><h3>Chiamata di controllo</h3>
+<p class="meta">L'agente vocale chiede come sta, se prende le medicine e se vuole essere richiamata. Le risposte arrivano qui.</p>
+<form method="post" action="/chiamate/nuova"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="kind" value="controllo">
+<input type="hidden" name="ref_id" value="{{ c.id }}"><input type="hidden" name="patient_id" value="{{ c.patient_id }}"><button class="ghost">Prepara la chiamata</button></form></div>{% endif %}
+<div class="card"><h3>Storia della scheda</h3>
+{% for l in log %}<div class="meta">{{ l.ts }} · {{ l.text }}</div>{% else %}<div class="meta">Nessuna azione ancora.</div>{% endfor %}
+<form method="post" action="/caso/{{ c.id }}/nota" style="margin-top:10px"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<div class="row"><input name="testo" placeholder="Aggiungi una nota (es. chiamata fatta)" maxlength="500" style="flex:1"><button class="ghost">Aggiungi</button></div></form></div>
+</div></div>
+{% endblock %}

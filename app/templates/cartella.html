@@ -1,0 +1,82 @@
+{% extends "base.html" %}{% block title %}{{ p.name }}{% endblock %}{% block body %}
+<p class="crumb"><a href="/pazienti">&larr; Pazienti</a></p>
+<header class="banner plain">
+  <div>
+    <div class="wl-top"><span class="kind">Cartella</span>{% if p.origin and p.origin != 'anagrafe' %}<span class="pill imp">importato</span>{% endif %}<span class="origin">FSE: consenso {{ 'sì' if p.consenso_fse else 'no' }}</span></div>
+    <h1>{{ p.name }}</h1>
+    <p class="banner-facts"><span>{{ p.age }} anni</span><span>C.F. <span class="mono">{{ p.cf }}</span></span><span>{{ p.address or 'indirizzo non indicato' }}{% if p.quartiere %} ({{ p.quartiere }}){% endif %}</span>{% if p.phone %}<span>tel. {{ p.phone }}</span>{% endif %}<span>medico di famiglia {{ p.mmg }}</span></p>
+  </div>
+  <div class="banner-side">
+    <form method="post" action="/chiamate/nuova"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="kind" value="controllo">
+    <input type="hidden" name="patient_id" value="{{ p.id }}"><button class="ghost">Chiamata di controllo con l'agente vocale</button></form>
+    <form method="post" action="/pazienti/{{ p.id }}/documenti" enctype="multipart/form-data" class="dzform"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <label class="dropzone compact"><input type="file" name="files" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.xml"><span class="dz-msg">Trascina qui PDF, scansioni o foto · <u>scegli i file</u></span></label></form>
+  </div>
+</header>
+{% set open_cases = cases|selectattr('status', 'equalto', 'pending')|list %}
+{% if open_cases %}<h2 class="listhead">Da firmare <span class="count">{{ open_cases|length }}</span></h2>
+<div class="worklist">{% for c in open_cases %}{% set lv = level_of(c) %}{% set ev = c.evidence|fromjson %}
+<article class="wl-row lv-{{ lv.key }} static">
+  <div class="prio" title="Priorità {{ lv.label|lower }}: {{ lv.hint }}{% if lv.raised %} (alzata da una regola fissa){% endif %}"><span class="prio-label"><span class="prio-sym" aria-hidden="true">{{ lv.symbol }}</span> {{ lv.label }}</span><span class="prio-score" aria-label="punteggio {{ c.score }} su 100">{{ c.score }}</span><span class="sr-only">Priorità: {{ lv.label|lower }}</span></div>
+  <div class="wl-main">
+    <div class="wl-top"><span class="kind">{{ c.tag }}</span></div>
+    <p class="reason">{{ c.summary }}</p>
+    <div class="chips sources">{% for e in ev if e[0] in all_docs|map(attribute='id')|list %}<a class="chip" href="/pazienti/{{ p.id }}?doc={{ e[0] }}#fonte">Visualizza la fonte <span class="mono">{{ e[0] }}</span></a>{% endfor %}</div>
+    <div class="row actions"><a class="btn" href="/caso/{{ c.id }}">Verifica e firma</a></div>
+  </div>
+</article>{% endfor %}</div>{% endif %}
+<div class="grid g3 summary section">
+<div class="card"><h3>Condizioni</h3>{% for c, src in conds.items() %}<div>{{ c }} <span class="meta">· fonte {% for d, rep, snip in src %}<a href="/pazienti/{{ p.id }}?doc={{ d }}&hl={{ snip|urlencode }}#fonte">{{ d }}</a>{{ ', ' if not loop.last }}{% endfor %}</span></div>{% else %}<div class="meta">Nessuna letta nei documenti</div>{% endfor %}</div>
+<div class="card"><h3>Farmaci citati nei documenti</h3>{% for k, src in therapy.items() %}<div>{{ k.replace('_',' ') }} <span class="meta">· {% for d, spec, snip in src %}<a href="/pazienti/{{ p.id }}?doc={{ d }}&hl={{ snip|urlencode }}#fonte">{{ d }}</a> ({{ spec }}){{ ', ' if not loop.last }}{% endfor %}</span></div>{% else %}<div class="meta">Nessuno</div>{% endfor %}
+<p class="small">Ogni dato porta alla frase del documento da cui è stato letto.</p></div>
+<div class="card"><h3>Agenda</h3>{% for a in appts %}<div>{{ a.at }} · {{ a.service }} <span class="meta">({{ a.status }})</span>{% if a.kit and a.kit.status=='riservato' %}<div class="note" style="margin:4px 0 8px">Visita accessibile: {{ a.kit.nota }}
+<form method="post" action="/kit/{{ a.kit.id }}/visita" style="margin-top:6px"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>Avvia la visita col kit</button></form></div>{% endif %}</div>{% endfor %}
+{% for w in wl %}<div>In lista: {{ w.service }}, priorità {{ w.priority }} <span class="meta">dal {{ w.since }}</span></div>{% endfor %}
+{% if not appts and not wl %}<div class="meta">Niente in agenda</div>{% endif %}</div>
+</div>
+{% set last = vals[0] if vals else none %}
+<div class="card" id="valutazione"><div class="cardhead">
+<h3>Fine visita: urgenza e motivi</h3>
+{% if last %}<span class="meta">Ultima: <b>{{ URGENCY[last.urgency] }}</b> · {{ last.at[:16] }} · {{ last.doctor }}</span>{% else %}<span class="meta">Nessuna valutazione ancora</span>{% endif %}</div>
+{% if last %}<p class="small">{% if last.labels %}Motivi segnati: {{ last.labels|join('; ') }}{% else %}Nessun motivo segnato{% endif %}{% if last.note %} · Nota: {{ last.note }}{% endif %}</p>{% endif %}
+<details{% if not last %} open{% endif %}><summary>{{ 'Nuova valutazione' if last else 'Registra la valutazione di questa visita' }}</summary>
+<form method="post" action="/pazienti/{{ p.id }}/valutazione" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<p class="meta">L'urgenza entra nel punteggio delle segnalazioni di questo paziente nella tua lista (voce "Valutazione del medico"). Resta in ospedale: non va al cloud e l'accettazione non la vede.</p>
+<fieldset><legend>Urgenza con cui considerare il paziente</legend><div class="row">
+{% for k, l in URGENCY.items() %}<label><input type="radio" name="urgenza" value="{{ k }}" required> {{ l }}</label>{% endfor %}</div></fieldset>
+<fieldset><legend>In base a cosa (facoltativo)</legend><div class="grid g2">
+{% for k, l in VFLAGS.items() %}<label><input type="checkbox" name="motivi" value="{{ k }}"> {{ l }}</label>{% endfor %}</div></fieldset>
+<label for="nota">Nota (facoltativa)</label><input id="nota" name="nota" maxlength="500">
+{% if appts %}<label for="visita">Visita a cui si riferisce (facoltativa)</label><select id="visita" name="visita"><option value="">-</option>
+{% for a in appts %}<option value="{{ a.id }}">{{ a.at }} · {{ a.service }}</option>{% endfor %}</select>{% endif %}
+<p><button>Salva la valutazione</button></p></form></details>
+{% if vals|length > 1 %}<details><summary>Valutazioni precedenti ({{ vals|length - 1 }})</summary>
+{% for v in vals[1:] %}<div class="meta">{{ v.at[:16] }} · {{ v.doctor }} · <b>{{ URGENCY[v.urgency] }}</b> · {{ v.labels|join('; ') }}{% if v.note %} · {{ v.note }}{% endif %}</div>{% endfor %}</details>{% endif %}
+</div>
+<h2 class="listhead section">Documenti <span class="count">{{ all_docs|length }}</span></h2>
+<div class="folder">
+<nav class="doclist card">
+<div class="filters"><a href="/pazienti/{{ p.id }}" class="chip {{ 'on' if not tipo }}">Tutti ({{ all_docs|length }})</a>
+{% for k in kinds %}<a href="/pazienti/{{ p.id }}?tipo={{ k }}" class="chip {{ 'on' if tipo==k }}">{{ DOC_KIND.get(k,k) }}</a>{% endfor %}</div>
+{% for d in docs %}<a href="/pazienti/{{ p.id }}?doc={{ d.id }}{% if tipo %}&tipo={{ tipo }}{% endif %}" class="doc {{ 'on' if cur and d.id==cur.id }}">
+<span class="meta mono">{{ d.date }}</span>{% if d.id in flagged %} <span class="pill warn">segnalato</span>{% endif %}{% if not d.file %} <span class="pill">solo testo</span>{% endif %}<br>
+<b>{{ d.title or DOC_KIND.get(d.kind, d.kind) }}</b><br><span class="meta">{{ d.source }}</span></a>{% else %}<div class="meta" style="padding:8px">Nessun documento.</div>{% endfor %}
+</nav>
+<article class="card reader" id="fonte">{% if cur %}
+<div class="tag">{{ DOC_KIND.get(cur.kind, cur.kind) }} · {{ cur.source }}</div>
+<h2 style="margin-top:4px">{{ cur.title }}</h2>
+<p class="meta"><span class="mono">{{ cur.id }}</span> · {{ cur.date }} · {{ cur.author }}</p>
+{% if cur.file %}
+<div class="verify {{ 'ok' if verified else 'ko' }}">{% if verified %}Fonte verificata: l'originale è identico a quello importato (impronta SHA-256 <span class="mono">{{ cur.sha256[:12] }}…</span>).{% else %}ATTENZIONE: l'originale non corrisponde all'impronta registrata all'importazione.{% endif %}
+<br><span class="small">Da: {{ cur.origin }} · importato il {{ cur.imported_at }} da {{ cur.imported_by }} · letto con: {{ cur.read_with }}</span></div>
+<div class="row" style="margin:10px 0"><a class="btn ghost" href="/documenti/{{ cur.id }}/originale" target="_blank" rel="noopener">Apri l'originale</a><a class="btn ghost" href="/documenti/{{ cur.id }}/originale?scarica=1">Scarica</a></div>
+<div class="twocol"><div><h3>Originale</h3>{% if cur.pages %}<div class="pages">{% for n in range(1, cur.pages + 1) %}<img src="/documenti/{{ cur.id }}/pagina/{{ n }}" alt="Pagina {{ n }} dell'originale" loading="lazy">{% endfor %}</div>{% else %}<iframe class="orig" src="/documenti/{{ cur.id }}/originale" title="Originale {{ cur.id }}"></iframe>{% endif %}</div>
+<div><h3>Testo letto e dati estratti</h3>
+{% else %}<div class="verify">Documento senza originale: solo il testo registrato nel sistema.</div><div>{% endif %}
+<div class="doctext">{% for t, label, f in parts %}{% if label %}<mark class="{{ 'focus' if f }}" title="{{ label }}">{{ t }}</mark>{% else %}{{ t }}{% endif %}{% endfor %}</div>
+{% if cur_sigs %}<p class="small" style="margin-top:10px">Dati letti da questo documento (restano in ospedale; al cloud va solo la voce della lista chiusa):</p>
+<div class="chips">{% for s in cur_sigs %}<span class="chip">{{ FIELD_LABEL.get(s.field, s.field) }}: {{ s.value.replace('|', ' · ').replace('_',' ') }}</span>{% endfor %}</div>{% endif %}
+{% if cur.file %}</div></div>{% else %}</div>{% endif %}
+{% else %}<p class="meta">Nessun documento. Trascina i file nella zona in alto per aggiungerli.</p>{% endif %}</article>
+</div>
+{% endblock %}

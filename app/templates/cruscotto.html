@@ -1,0 +1,78 @@
+{% extends "base.html" %}{% block title %}Dashboard{% endblock %}{% block body %}
+<header class="pagehead">
+  <div><h1>Dashboard</h1>
+  <p class="sub">Buongiorno, {{ (user.first_name or user.name.split(' ')[0]) }}. Trasporti, posti liberati e kit: la parte logistica. I segnali clinici li vede il medico.</p></div>
+  <form method="post" action="/elabora"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>Elabora le novità</button></form>
+</header>
+
+<div class="widgets">
+
+<section class="widget w-persone" aria-label="Persone della giornata">
+  <div class="w-head"><h2>Persone della giornata</h2><span class="count">{{ persone|selectattr('oggi')|list|length }} con visita oggi o domani</span></div>
+  <label class="sr-only" for="cerca-persona">Cerca una persona</label>
+  <input id="cerca-persona" class="w-search" type="search" placeholder="Scrivi il nome della persona" autocomplete="off" data-filtra="#lista-persone">
+  <div id="lista-persone" class="w-list">
+  {% for x in persone %}<a class="w-row persona-row" href="/persona/{{ x.id }}" data-dentro data-nome="{{ x.name|lower }}">
+    <span class="w-main"><b>{{ x.name }}</b><span class="meta">{{ x.age }} anni{% if x.visita %} · {{ x.visita.service }} {{ 'oggi' if x.visita.at[:10] == TODAY else ('domani' if x.visita.at[:10] == domani else x.visita.at[8:10] ~ '/' ~ x.visita.at[5:7]) }} {{ x.visita.at[11:16] }}{% endif %}{% if x.trasporto %} · trasporto: {{ x.trasporto|lower }}{% endif %}</span></span>
+    {% if x.kit %}<span class="pill imp" title="Ha chiesto il supporto per l'udito: serve il kit">kit</span>{% endif %}
+    {% if x.aperti %}<span class="pill warn">{{ x.aperti }} da fare</span>{% elif x.oggi %}<span class="pill imp">oggi</span>{% endif %}
+  </a>{% endfor %}
+  <p class="meta w-vuoto" hidden>Nessuna persona con questo nome.</p>
+  </div>
+</section>
+
+<div class="w-col">
+{% include "_pannello.html" %}
+
+<section class="widget" aria-label="Novità della giornata">
+  <div class="w-head"><h2>Novità della giornata</h2>{% if run %}<span class="meta">elaborazione {{ run.finished_at|fa }}</span>{% endif %}</div>
+  {% for e in events %}<div class="callout {{ 'callout-warn' if e.kind == 'sciopero' else 'callout-info' }}" role="note">
+    <span class="callout-icon" aria-hidden="true">{{ '⚠' if e.kind == 'sciopero' else 'ℹ' }}</span>
+    <div><b>{{ 'Sciopero' if e.kind == 'sciopero' else ('Ondata di calore' if e.kind == 'caldo' else 'Avviso') }} · {{ e.date[8:10] }}/{{ e.date[5:7] }}</b><div>{{ e.text }}</div></div>
+  </div>{% else %}<p class="meta">Nessun avviso per oggi.</p>{% endfor %}
+  {% if not run %}<p class="meta">Nessuna elaborazione ancora: premi <b>Elabora le novità</b>.</p>{% endif %}
+</section>
+
+<section class="widget" aria-label="Calendario">
+  <div class="w-head"><h2>Calendario</h2><a class="w-link" href="/calendario">Apri il calendario</a></div>
+  {% for a in visite_vicine %}<a class="w-row" href="/persona/{{ a.patient_id }}/calendario" data-dentro>
+    <span class="w-main"><b>{{ a.patient }}</b><span class="meta">{{ a.service }} · {{ a.place }}</span></span>
+    <span class="mono w-when">{{ 'oggi' if a.at[:10] == TODAY else 'domani' }} {{ a.at[11:16] }}</span></a>
+  {% else %}<p class="meta">Nessuna visita oggi e domani.</p>{% endfor %}
+</section>
+
+<section class="widget" aria-label="Posta in uscita">
+  <div class="w-head"><h2>Posta in uscita</h2><a class="w-link" href="/posta">Tutta la posta</a></div>
+  {% for m in posta_w %}<div class="w-row"><span class="w-main"><b>{{ m.subject }}</b><span class="meta">a {{ m.recipient }}</span></span><span class="meta w-when">{{ m.ts[11:16] }}</span></div>
+  {% else %}<p class="meta">Ancora nessuna mail.</p>{% endfor %}
+</section>
+</div>
+
+<section class="widget w-wide" aria-label="Da fare">
+  <div class="w-head"><h2>Da fare</h2><span class="count">{{ groups|length }} {{ 'persona' if groups|length == 1 else 'persone' }}</span>
+  <span class="w-kpi">{% for _, k, label, sym, hint in LEVELS[:3] %}<span class="lv-{{ k }}"><b>{{ counts[k] }}</b> {{ label|lower }}</span>{% endfor %}</span></div>
+  {% for g in groups %}{% set c = g.top %}{% set lv = level_of(c) %}
+  <details class="todo-row lv-{{ lv.key }}">
+    <summary><span class="prio-label"><span class="prio-sym" aria-hidden="true">{{ lv.symbol }}</span> {{ lv.label }}<span class="sr-only">Priorità: {{ lv.label|lower }}</span></span>
+      <span class="w-main"><b>{{ g.patient.name }}</b><span class="meta">{% for i in g.cose %}{{ i.tag }}{{ ' · ' if not loop.last }}{% endfor %}</span></span>
+      <span class="meta w-when">{{ c.since|fa }}</span></summary>
+    <div class="todo-body">
+      <p class="reason">{{ c.summary }}</p>
+      {% for i in g.cose %}{% set pl = i.payload|fromjson if i.payload else {} %}
+      <div class="todo">
+        <p class="proposal"><span>{{ {'trasporto': 'Trasporto', 'kit': 'Kit', 'posto': 'Posto liberato'}.get(i.kind, i.tag) }}</span> {{ i.action }}</p>
+        {% if i.role_note %}<p class="note">{{ i.role_note }}</p>{% endif %}
+        <form method="post" action="/caso/{{ i.id }}/approva"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="torna" value="cruscotto">
+          <button>{{ {'trasporto': 'Via libera' if pl.get('service') else 'Prendo in carico', 'kit': 'Riserva il kit', 'posto': 'Approva la chiamata'}.get(i.kind, 'Approva') }}</button></form>
+      </div>{% endfor %}
+      <div class="row actions"><a class="btn ghost" href="/caso/{{ c.id }}">Dettagli{% if g.cose|length > 1 %} ({{ g.cose|length }}){% endif %}</a>
+      <a class="btn ghost" href="/persona/{{ g.patient.id }}" data-dentro>Apri {{ g.patient.name.split(' ')[0] }}</a></div>
+    </div>
+  </details>
+  {% else %}<p class="meta">Niente in sospeso. Quando arrivano novità le trovi qui, in ordine di priorità.</p>{% endfor %}
+  {% if done %}<details class="done-box"><summary>Già decisi oggi ({{ done|length }})</summary>
+  {% for c in done %}<div class="w-row"><span class="w-main"><a href="/caso/{{ c.id }}"><b>{{ c.patient.name }}</b></a><span class="meta">{{ KIND_LABEL.get(c.kind, c.kind) }} · {{ 'fatto' if c.status=='ok' else 'scartato' }} da {{ c.decided_by }}</span></span><span class="meta w-when">{{ c.decided_at|fa }}</span></div>{% endfor %}</details>{% endif %}
+</section>
+
+</div>
+{% endblock %}

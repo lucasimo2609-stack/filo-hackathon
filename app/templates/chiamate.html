@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% block title %}Chiamate{% endblock %}{% block body %}
+<header class="pagehead">
+  <div><h1>Chiamate dell'agente vocale</h1>
+  <p class="sub">L'agente chiama, verifica chi risponde e registra. Voce ElevenLabs, ragionamento Fastweb.</p></div>
+</header>
+{% if not eleven %}<div class="callout callout-info" role="note"><span class="callout-icon" aria-hidden="true">ℹ</span>
+  <div><b>ElevenLabs non è ancora configurato</b><div>Le chiamate si provano con il simulatore a testo.</div></div></div>{% endif %}
+{% if user.role == 'segreteria' %}
+<div class="grid g2">
+<div class="card"><div class="cardhead"><h3>Trasporti da confermare con la persona</h3><span class="listhead"><span class="count">{{ da_chiamare|length }}</span></span></div>
+<div class="rowlist">{% for t in da_chiamare %}<form method="post" action="/chiamate/nuova">
+<input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="kind" value="trasporto"><input type="hidden" name="ref_id" value="{{ t.id }}"><input type="hidden" name="patient_id" value="{{ t.patient_id }}">
+<span><b>{{ t.patient }}</b> <span class="meta">visita {{ t.at }}</span></span><button>Prepara chiamata</button></form>
+{% else %}<p class="meta">Nessuno: compaiono quando un servizio ha dato la disponibilità.</p>{% endfor %}</div></div>
+<div class="card"><div class="cardhead"><h3>Posti e modifiche da proporre</h3><span class="listhead"><span class="count">{{ da_proporre|length + da_modificare|length }}</span></span></div>
+<div class="rowlist">{% for o in da_proporre %}<div>
+<span><b>{{ o.patient }}</b> <span class="meta">{{ o.service }} {{ o.at }} · chiamata approvata</span></span><a class="btn" href="/chiamate/{{ o.call_id }}">Apri la chiamata</a></div>
+{% endfor %}{% for m in da_modificare %}<div>
+<span><b>{{ m.patient }}</b> <span class="meta">modifica di {{ m.service }} {{ m.at }} · chiamata approvata</span></span><a class="btn" href="/chiamate/{{ m.call_id }}">Apri la chiamata</a></div>
+{% endfor %}{% if not da_proporre and not da_modificare %}<p class="meta">Nessuno: compaiono quando approvi la proposta di un posto liberato o di una modifica. Ordine e storia dei tentativi nella pagina <a href="/posti">Posti liberati</a>.</p>{% endif %}</div></div>
+</div>
+{% else %}
+<p class="meta">Le chiamate di controllo si preparano dalla segnalazione o dalla cartella del paziente.</p>
+{% endif %}
+<section class="section">
+<h2 class="listhead">Tutte le chiamate <span class="count">{{ rows|length }}</span></h2>
+<div class="card flush"><table class="list-table"><tr><th>Creata</th><th>Persona</th><th>Motivo</th><th>Canale</th><th>Stato</th></tr>
+{% for r in rows %}<tr><td class="mono">{{ r.created_at[11:16] }}</td><td><a href="/chiamate/{{ r.id }}">{{ r.patient }}</a></td><td>{{ r.label }}</td><td>{{ r.channel or '–' }}</td>
+<td><span class="st {{ 'nessun_servizio' if r.alarm else ('confermato' if r.status=='conclusa' else 'attesa_servizio') }}">{{ r.st }}</span></td></tr>
+{% else %}<tr><td colspan="5" class="empty">Nessuna chiamata ancora.</td></tr>{% endfor %}</table></div>
+</section>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}Posta in uscita{% endblock %}{% block body %}
+<header class="pagehead">
+  <div><h1>Posta in uscita</h1>
+  <p class="sub">Le mail restano qui; se nel .env è configurato l'invio, una copia vera parte solo all'indirizzo di prova. Le conferme alle persone sono nel formato del CUP.</p></div>
+</header>
+<h2 class="listhead">Messaggi <span class="count">{{ mails|length }}</span></h2>
+<div class="stack">
+{% for m in mails %}<article class="card mailcard">
+<div class="cardhead"><span class="meta">{{ m.ts[8:10] }}/{{ m.ts[5:7] }} {{ m.ts[11:16] }} · da {{ m.sender or 'Centrale Operativa Territoriale' }} · a <b>{{ m.recipient }}</b></span>
+{% if m.sent_to %}<span class="st {{ 'nessun_servizio' if m.sent_to.startswith('invio') else 'confermato' }}">{{ 'copia inviata a ' + m.sent_to if not m.sent_to.startswith('invio') else m.sent_to }}</span>{% endif %}</div>
+<h3>{{ m.subject }}</h3>
+{% if m.html %}<iframe class="mailprev" sandbox src="/posta/{{ m.id }}/anteprima" title="{{ m.subject }}"></iframe>
+<details><summary>Versione solo testo</summary><div style="white-space:pre-wrap" class="meta">{{ m.body }}</div></details>
+{% else %}<div style="white-space:pre-wrap">{{ m.body }}</div>{% endif %}
+{% if m.ics %}<p><a class="btn ghost" href="/posta/{{ m.id }}/calendario.ics">Allegato: evento per il calendario</a></p>{% endif %}</article>
+{% else %}<div class="card empty"><b>Ancora niente.</b> Le mail nascono quando approvi un caso dal cruscotto.</div>{% endfor %}
+</div>
+{% endblock %}

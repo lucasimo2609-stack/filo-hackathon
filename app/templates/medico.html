@@ -1,0 +1,61 @@
+{% extends "base.html" %}{% block title %}Da firmare{% endblock %}{% block body %}
+<header class="pagehead">
+  <div><h1>{{ user.name }}</h1>
+  <p class="sub">Ogni segnalazione porta alla frase del documento originale. Decidi tu: firmi o scarti con il codice a tempo.</p></div>
+  <form method="post" action="/elabora"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>Elabora le novità</button></form>
+</header>
+<div class="{{ 'con-pannello' if pannello }}"><div>
+
+<section class="overview" aria-label="Riepilogo">
+  {% for _, k, label, sym, hint in LEVELS[:3] %}
+  <div class="kpi-tile lv-{{ k }}"><span class="lv-dot" aria-hidden="true">{{ sym }}</span><b>{{ counts[k] }}</b><span>{{ label }}</span><small>{{ hint }}</small></div>
+  {% endfor %}
+  <div class="kpi-tile"><b>{{ docs_new|length }}</b><span>documenti nuovi</span><small>dal {{ since_docs[8:10] }}/{{ since_docs[5:7] }}</small></div>
+</section>
+{% if run %}<p class="meta runline">Ultima elaborazione {{ run.finished_at|fa }}</p>{% endif %}
+
+{% for n in nuovi %}
+<article class="nuovo" aria-label="Nuovo in agenda">
+  <div class="nuovo-main">
+    <div class="wl-top"><span class="kind">Nuovo in agenda</span><span class="origin og-regola">Dal posto liberato</span><span class="when">{{ n.ts|fa }}</span></div>
+    <h2><a href="/pazienti/{{ n.patient.id }}">{{ n.patient.name }}</a> <span class="who-meta">{{ n.patient.age }} anni · MMG {{ n.patient.mmg }}</span></h2>
+    <p class="banner-facts"><span><b>{{ n.a.service }}</b> {{ n.a.at[8:10] }}/{{ n.a.at[5:7] }} alle {{ n.a.at[11:16] }}</span><span>{{ n.a.place }}</span>{% if n.priority %}<span>ricetta {{ PRIO_TESTO.get(n.priority, n.priority) }}</span>{% endif %}</p>
+    <p class="banner-facts"><span>{{ n.n_docs }} documenti</span>{% if n.last %}<span>ultimo: {{ n.last.title }} ({{ n.last.date[8:10] }}/{{ n.last.date[5:7] }})</span>{% endif %}{% if n.open %}<span><b>{{ n.open }} da firmare</b></span>{% endif %}</p>
+  </div>
+  <a class="btn" href="/pazienti/{{ n.patient.id }}">Apri la cartella</a>
+</article>
+{% endfor %}
+<div class="mgrid">
+<section>
+<h2 class="listhead">Da firmare <span class="count">{{ pending|length }}</span></h2>
+<div class="worklist">
+{% for c in pending %}{% set lv = level_of(c) %}{% set og = origine(c) %}
+<article class="wl-row lv-{{ lv.key }} static">
+  <div class="prio" title="Priorità {{ lv.label|lower }}: {{ lv.hint }}{% if lv.raised %} (alzata da una regola fissa){% endif %}"><span class="prio-label"><span class="prio-sym" aria-hidden="true">{{ lv.symbol }}</span> {{ lv.label }}</span><span class="prio-score" aria-label="punteggio {{ c.score }} su 100">{{ c.score }}</span><span class="sr-only">Priorità: {{ lv.label|lower }}</span></div>
+  <div class="wl-main">
+    <div class="wl-top"><span class="kind">{{ c.tag }}</span><span class="origin og-{{ og.key }}" title="{{ og.hint }}">{{ og.label }}</span><span class="when">{{ c.since|fa }}</span></div>
+    <h3><a href="/pazienti/{{ c.patient.id }}">{{ c.patient.name }}</a> <span class="who-meta">{{ c.patient.age }} anni · MMG {{ c.patient.mmg }}</span></h3>
+    <p class="reason">{{ c.summary }}</p>
+    {% if c.ev %}<div class="chips sources" aria-label="Fonti">{% for e in c.ev %}{% if e[0].startswith('E-') or e[0].startswith('D-') %}<a class="chip" href="/pazienti/{{ c.patient.id }}?doc={{ e[0] }}#fonte">{{ e[1].split(' · ')[1] if ' · ' in e[1] else e[1] }} <span class="mono">{{ e[0] }}</span></a>{% endif %}{% endfor %}</div>{% endif %}
+    {% if c.role_note %}<p class="note">{{ c.role_note }}</p>{% endif %}
+    <div class="row actions"><a class="btn" href="/caso/{{ c.id }}">Verifica e firma</a><a class="btn ghost" href="/pazienti/{{ c.patient.id }}">Cartella</a></div>
+  </div>
+</article>
+{% else %}<div class="card empty"><b>Niente da firmare.</b> Le nuove segnalazioni arrivano qui, in ordine di priorità.</div>{% endfor %}
+</div>
+{% if done %}<details class="done-box"><summary>Già decise ({{ done|length }})</summary>
+<div class="card flush"><table class="list-table"><tr><th>Paziente</th><th>Tipo</th><th>Esito</th><th>Quando</th></tr>
+{% for c in done %}<tr><td><a href="/caso/{{ c.id }}">{{ c.patient.name }}</a></td><td>{{ KIND_LABEL.get(c.kind, c.kind) }}</td><td><span class="st {{ 'confermato' if c.status=='ok' else 'annullato' }}">{{ 'Firmata' if c.status=='ok' else 'Scartata' }}</span></td><td>{{ c.decided_at|fa }}</td></tr>{% endfor %}</table></div></details>{% endif %}
+</section>
+<aside class="side">
+<h2 class="listhead">Agenda <span class="count">{{ agenda|length }}</span></h2>
+<div class="card list">{% for a in agenda %}<a href="/pazienti/{{ a.patient_id }}"><b>{{ a.patient }}</b>{% if a.slot %} <span class="pill imp">posto liberato</span>{% endif %}<span class="meta"> · {{ a.at[8:10] }}/{{ a.at[5:7] }} {{ a.at[11:16] }}</span><br><span class="meta">{{ a.service }}</span></a>{% else %}<div class="meta">Nessuna visita in agenda.</div>{% endfor %}</div>
+{% if kit_visite %}<h2 class="listhead">Visite accessibili</h2>
+<div class="card">{% for k in kit_visite %}<div class="ev"><div class="meta">{{ k.at[8:10] }}/{{ k.at[5:7] }} {{ k.at[11:16] }} · <a href="/pazienti/{{ k.patient_id }}">{{ k.patient }}</a> · {{ k.service }}</div><div>{{ k.nota }}</div>
+<form method="post" action="/kit/{{ k.id }}/visita" style="margin-top:6px"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>Avvia la visita col kit</button></form></div>{% endfor %}</div>{% endif %}
+<h2 class="listhead">Documenti nuovi</h2>
+<div class="card list">{% for d in docs_new %}<a href="/pazienti/{{ d.patient_id }}?doc={{ d.id }}"><b>{{ d.patient }}</b><span class="meta"> · {{ d.date[8:10] }}/{{ d.date[5:7] }}</span><br><span class="meta">{{ d.title }}</span></a>{% else %}<div class="meta">Nessun documento negli ultimi giorni.</div>{% endfor %}</div>
+<p><a class="btn ghost wide" href="/pazienti">Tutti i pazienti</a></p>
+</aside></div>
+</div>{% include "_pannello.html" %}</div>
+{% endblock %}

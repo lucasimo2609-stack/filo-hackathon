@@ -1,0 +1,11 @@
+{% if pannello %}{% set q = pannello %}<section class="widget pannello" aria-label="Paziente aperto"><div>
+<div class="w-head"><h2><a href="/persona/{{ q.p.id }}" data-dentro>{{ q.p.name }}</a></h2><span class="meta">paziente aperto</span></div>
+{% if q.prossima %}<p class="meta">Prossima visita: {{ q.prossima.service }}, {{ q.prossima.at[8:10] }}/{{ q.prossima.at[5:7] }} alle {{ q.prossima.at[11:16] }}</p>{% endif %}
+<div class="riga"><span>Da fare</span><b>{{ q.aperti|length }}</b></div>
+{% for c in q.aperti[:3] %}<div class="riga"><a href="/caso/{{ c.id }}">{{ KIND_LABEL.get(c.kind, c.kind) }}</a><span class="meta">apri</span></div>{% endfor %}
+{% if q.kit_info.serve %}<div class="riga"><span>Kit per l'udito</span><span class="meta">{{ q.kit_info.stato }}</span></div>{% endif %}
+{% if q.trasporti %}{% set t = q.trasporti[0] %}<div class="riga"><a href="/trasporti/{{ t.id }}">Trasporto</a><span class="st {{ t.status }}">{{ t.label }}</span></div>{% endif %}
+{% if q.ultimo %}<p class="small" style="margin-top:8px">Ultimo passo, {{ q.ultimo.ts[11:16] }}: {{ q.ultimo.text[:140] }}</p>{% endif %}
+<div class="row" style="margin-top:10px"><a class="btn" href="/persona/{{ q.p.id }}" data-dentro>Apri la scheda</a>
+<form method="post" action="/segui/tutti"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="ghost">Chiudi il paziente</button></form></div>
+</div></section>{% endif %}

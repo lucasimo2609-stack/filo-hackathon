@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block title %}Trasporti{% endblock %}{% block body %}
+<header class="pagehead">
+  <div><h1>Trasporti</h1>
+  <p class="sub">Pratiche aperte: Filo chiede, l'agente chiama e conferma.</p></div>
+</header>
+<h2 class="listhead">Pratiche <span class="count">{{ rows|length }}</span></h2>
+<div class="card flush"><table class="list-table">
+<tr><th>Visita</th><th>Persona</th><th>Servizio</th><th>Stato</th></tr>
+{% for r in rows %}<tr><td class="mono">{{ r.at[8:10] }}/{{ r.at[5:7] }} {{ r.at[11:16] }}</td><td><a href="/trasporti/{{ r.id }}">{{ r.patient }}</a></td><td>{{ r.service }}</td><td><span class="st {{ r.status }}">{{ r.label }}</span></td></tr>
+{% else %}<tr><td colspan="4" class="empty"><b>Nessuna pratica.</b> Nascono quando dai il via libera a un trasporto dal cruscotto.</td></tr>{% endfor %}</table></div>
+
+<section class="section">
+<h2 class="listhead">Servizi di trasporto <span class="count">{{ services|length }}</span></h2>
+<div class="grid g3">{% for s in services %}<div class="card svc"><h3>{{ s.name }}</h3><p>{{ s.rules }}</p>
+<p class="meta">Come si prenota: {{ s.booking }} · {{ s.response }} · {{ s.cost }} · distretti {{ s.distretti.replace(',', ', ') }}</p></div>{% endfor %}</div>
+<p class="small">Nessuno di questi servizi pubblica un calendario o una prenotazione online: si chiede la disponibilità e si aspetta la risposta. Le regole di STACCO e Croce Verde vengono dai loro siti; i contatti qui sono finti.</p>
+</section>
+{% endblock %}

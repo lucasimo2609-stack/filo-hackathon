@@ -1,0 +1,35 @@
+<!doctype html><html lang="it" data-theme="{{ user.theme if user and user.theme else 'auto' }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Filo · {% block title %}Centrale Operativa{% endblock %}</title>
+<link rel="stylesheet" href="/static/filo.css?v={{ V }}"></head><body class="{{ user.role if user else 'out' }}" data-ora="{{ ora }}">
+{% set path = request.url.path %}{% if user %}<div class="shell">
+<nav class="side" aria-label="Menu">
+<a class="side-brand" href="/cruscotto"><img class="logo-filo" src="/static/logo-filo.png?v={{ V }}" alt="Filo" width="1084" height="505"><small>{{ 'Ambulatorio' if user.role=='medico' else 'Accettazione' }}</small></a>
+<div class="side-group"><div class="side-title">Lavoro</div>
+<a href="/cruscotto" class="{{ 'on' if path.startswith('/cruscotto') or path.startswith('/caso') }}">Dashboard</a>
+{% if user.role == 'medico' %}
+<a href="/pazienti" class="{{ 'on' if path == '/pazienti' }}">Pazienti e documenti</a>
+<a href="/importa" class="{{ 'on' if path.startswith('/importa') or path.startswith('/smistare') }}">Importa documenti</a>
+{% else %}
+<a href="/trasporti" class="{{ 'on' if path == '/trasporti' }}">Trasporti</a>
+<a href="/calendario" class="{{ 'on' if path.startswith('/calendario') }}">Calendario</a>
+<a href="/posti" class="{{ 'on' if path.startswith('/posti') }}">Posti liberati</a>
+{% endif %}
+<a href="/chiamate" class="{{ 'on' if path == '/chiamate' }}">Chiamate</a>
+<a href="/posta" class="{{ 'on' if path.startswith('/posta') }}">Posta in uscita</a>
+</div>
+{% if segui %}<div class="side-group side-persona"><div class="side-title">Paziente</div>
+<a href="/persona/{{ segui.id }}" data-dentro class="side-name {{ 'on' if path == '/persona/' ~ segui.id }}">{{ segui.name }}</a>
+<form method="post" action="/segui/tutti"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="ghost small-btn">Chiudi il paziente</button></form>
+</div>{% endif %}
+<div class="side-bottom">
+<a href="/impostazioni" class="gear {{ 'on' if path.startswith('/impostazioni') }}" title="Impostazioni: profilo, aspetto, log"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Impostazioni</a>
+<form method="post" action="/ripristina" data-conferma="Riportare la demo alle impostazioni iniziali? Si cancellano pratiche, chiamate, trasporti, posta e documenti importati. Gli utenti restano."><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="side-link" title="Riporta la demo allo stato iniziale">Ripristina demo</button></form>
+<div class="side-account"><span class="avatar">{{ (user.first_name or user.name)[:1] }}{{ (user.last_name or user.name.split(' ')[-1])[:1] }}</span><span class="side-who"><b>{{ user.name }}</b><small>{{ ROLE_LABEL[user.role] }}</small></span>
+<form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="ghost small-btn">Esci</button></form></div>
+</div>
+</nav>
+{% endif %}
+<main>{% block messages %}{% if flash %}<div class="flash" role="status">{{ flash }}</div>{% endif %}{% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}{% endblock %}{% block body %}{% endblock %}</main>{% if user %}</div>{% endif %}
+<footer class="small" style="text-align:center;padding:0 0 24px">Prototipo per l'hackathon FastwebAI · dati interamente sintetici · non è un dispositivo medico</footer>
+<script src="/static/filo.js?v={{ V }}"></script>
+</body></html>

@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block title %}Da smistare{% endblock %}{% block body %}
+<p class="crumb"><a href="/importa#smistare">&larr; Importa documenti</a></p>
+<header class="banner plain">
+  <div>
+    <div class="wl-top"><span class="kind">Documento da smistare {{ it.id }}</span><span class="origin og-mano">Decide una persona</span></div>
+    <h1>{{ it.original_name }}</h1>
+    <p class="banner-facts"><span>Motivo: {{ it.reason }}</span><span>arrivato il {{ it.imported_at }}</span><span>da {{ it.origin }}</span></p>
+  </div>
+</header>
+<div class="casegrid">
+<div class="card"><h3>Originale</h3>{% if it.pages %}<div class="pages">{% for n in range(1, it.pages + 1) %}<img src="/smistare/{{ it.id }}/pagina/{{ n }}" alt="Pagina {{ n }} dell'originale" loading="lazy">{% endfor %}</div>{% else %}<iframe class="orig" src="/smistare/{{ it.id }}/file" title="Originale"></iframe>{% endif %}
+<h3 style="margin-top:18px">Testo letto</h3><div class="doctext small">{{ it.text or '(nessun testo leggibile)' }}</div></div>
+<aside class="decide stack">
+<div class="card"><h3>A chi appartiene?</h3>
+<form method="get" action="/smistare/{{ it.id }}" class="searchbar" role="search"><label for="q" class="sr-only">Cerca</label><input id="q" name="q" type="search" value="{{ q }}" placeholder="Cerca per nome o codice fiscale"><button class="ghost">Cerca</button></form>
+{% if q %}<form method="post" action="/smistare/{{ it.id }}/assegna"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+{% for c in cands %}<label class="cand"><input type="radio" name="patient_id" value="{{ c.id }}" required> <b>{{ c.name }}</b> <span class="meta">nato/a il {{ c.birth_date }} · <span class="mono">{{ c.cf }}</span></span></label>
+{% else %}<p class="meta">Nessun paziente trovato.</p>{% endfor %}
+{% if cands %}<p><button class="wide">Assegna a questo paziente</button></p>{% endif %}</form>{% endif %}
+<p class="small">Controlla nome e data di nascita sull'originale prima di assegnare. L'assegnazione finisce nel registro.</p></div>
+<div class="card"><h3>Non è un documento clinico?</h3>
+<form method="post" action="/smistare/{{ it.id }}/scarta"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="danger">Scarta il documento</button></form></div>
+</aside>
+</div>
+{% endblock %}

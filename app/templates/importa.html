@@ -1,0 +1,56 @@
+{% extends "base.html" %}{% block title %}Importa documenti{% endblock %}{% block body %}
+<header class="pagehead">
+  <div><h1>Importa documenti</h1>
+  <p class="sub">Tutto avviene in ospedale: lettura, OCR, riconoscimento del paziente dal codice fiscale, archivio con impronta. Nessun documento va al cloud.</p></div>
+</header>
+<section class="overview" aria-label="Archivio">
+  <div class="kpi-tile"><b>{{ n_pat }}</b><span>pazienti</span><small>{{ n_cons }} con consenso FSE</small></div>
+  <div class="kpi-tile"><b>{{ n_docs }}</b><span>documenti</span><small>con impronta SHA-256</small></div>
+  <div class="kpi-tile {{ 'lv-urgente' if inbox }}"><b>{{ inbox|length }}</b><span>da smistare</span><small>decide una persona</small></div>
+  <div class="kpi-tile"><b>{{ files_in_dir }}</b><span>file in cartella</span><small>{{ 'OCR locale attivo' if ocr else 'OCR non installato' }}</small></div>
+</section>
+
+{% if cur %}<section class="section">
+<h2 class="listhead">Importazione {{ cur.id }} <span class="count">{{ cur.origin }}</span></h2>
+<div class="card reportbox"><div class="grid g3 kpi"><div><b>{{ cur.s.file }}</b><span>file letti in {{ cur.s.secondi }} s</span></div><div><b>{{ cur.s.aggiunti }}</b><span>documenti archiviati</span></div><div><b>{{ cur.s.pazienti_nuovi }}</b><span>pazienti creati</span></div>
+<div><b>{{ cur.s.da_smistare }}</b><span>da smistare a mano</span></div><div><b>{{ cur.s.doppioni }}</b><span>doppioni saltati</span></div><div><b>{{ cur.s.errori + cur.s.ignorati }}</b><span>ignorati o con errori</span></div></div>
+<details><summary>Dettaglio file per file</summary><table class="list-table"><tr><th>File</th><th>Esito</th><th>Note</th></tr>
+{% for r in cur.s.dettaglio %}<tr><td class="mono small">{{ r.file }}</td><td>{{ r.esito }}</td><td>{% if r.patient_id %}<a href="/pazienti/{{ r.patient_id }}?doc={{ r.id }}">apri</a>{% endif %} {{ r.motivo or '' }}</td></tr>{% endfor %}</table></details></div>
+</section>{% endif %}
+
+<section class="section">
+<h2 class="listhead">Da dove arrivano</h2>
+<div class="grid g2">
+<div class="card"><div class="cardhead"><h3>Cartella condivisa</h3><span class="pill imp">attivo</span></div>
+<p>La cartella dove l'azienda sanitaria deposita i documenti (SharePoint, OneDrive, Google Drive sincronizzati, o un disco di rete). Filo la legge tutta, sottocartelle e file .zip compresi.</p>
+<p class="meta">Percorso: <span class="mono">{{ import_dir }}</span> · {{ files_in_dir }} file presenti. Si cambia con FILO_IMPORT_DIR nel file .env.</p>
+<form method="post" action="/importa/cartella"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button>Importa ora dalla cartella</button></form></div>
+<div class="card"><div class="cardhead"><h3>Pacchetto o file sparsi</h3><span class="pill imp">attivo</span></div>
+<p>Un .zip esportato dall'archivio o più file insieme. Il paziente si riconosce dal codice fiscale in testata.</p>
+<form method="post" action="/importa/pacchetto" enctype="multipart/form-data"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<label class="dropzone"><input type="file" name="files" multiple accept=".zip,.pdf,.png,.jpg,.jpeg,.txt,.xml"><span class="dz-msg">Trascina qui il .zip o i file<br><u>oppure scegli</u></span></label></form>
+<p class="small">Pacchetto di prova: <span class="mono">esempi/importazione_esempio_40_pazienti.zip</span> (128 file, 40 pazienti nuovi, 2 referti per pazienti già presenti, un doppione e una scansione senza codice fiscale).</p></div>
+<div class="card"><div class="cardhead"><h3>Fascicolo Sanitario Elettronico 2.0</h3><span class="pill">non collegato</span></div>
+<p>Il medico ospedaliero può consultare il FSE solo se il paziente ha dato il consenso, e non vede i documenti che il paziente ha oscurato. Il collegamento passa dai servizi della Regione e richiede l'accreditamento della struttura.</p>
+<p class="meta">Pazienti con consenso registrato: {{ n_cons }} su {{ n_pat }}. Filo legge già i documenti in formato CDA2 (XML): quando il collegamento c'è, importa solo per chi ha il consenso.</p></div>
+<div class="card"><div class="cardhead"><h3>Sistemi dell'ospedale</h3><span class="pill">non collegato</span></div>
+<p>Cartella clinica, laboratorio, radiologia. Di solito parlano HL7 o FHIR. È il collegamento più pulito, perché i documenti arrivano già con il paziente giusto, ma va fatto con i fornitori dell'azienda sanitaria.</p></div>
+</div>
+<p class="small">Lettura delle scansioni: {{ 'OCR locale attivo (tesseract)' if ocr else 'OCR non installato: le scansioni finiscono tra i documenti da smistare. Su Linux: sudo apt install tesseract-ocr tesseract-ocr-ita poppler-utils' }}.</p>
+</section>
+
+<section class="section">
+<h2 class="listhead" id="smistare">Da smistare <span class="count">{{ inbox|length }}</span></h2>
+<p class="sub">Documenti senza codice fiscale, con un codice non valido o con un nome che non torna. L'AI non indovina a chi appartengono: decide una persona.</p>
+<div class="card flush"><table class="list-table"><tr><th>File</th><th>Motivo</th><th>Arrivato</th></tr>
+{% for i in inbox %}<tr><td class="mono small"><a href="/smistare/{{ i.id }}">{{ i.original_name }}</a></td><td>{{ i.reason }}</td><td class="mono">{{ i.imported_at }}</td></tr>
+{% else %}<tr><td colspan="3" class="empty">Niente da smistare.</td></tr>{% endfor %}</table></div>
+</section>
+
+<section class="section">
+<h2 class="listhead">Ultime importazioni <span class="count">{{ jobs|length }}</span></h2>
+<div class="card flush"><table class="list-table"><tr><th>Quando</th><th>Da</th><th class="num">File</th><th class="num">Archiviati</th><th class="num">Pazienti nuovi</th><th class="num">Da smistare</th><th class="num">Tempo</th></tr>
+{% for j in jobs %}<tr><td><a href="/importa?job={{ j.id }}">{{ j.started_at }}</a></td><td>{{ j.origin }}</td><td class="num">{{ j.s.file }}</td><td class="num">{{ j.s.aggiunti }}</td><td class="num">{{ j.s.pazienti_nuovi }}</td><td class="num">{{ j.s.da_smistare }}</td><td class="num">{{ j.s.secondi }} s</td></tr>
+{% else %}<tr><td colspan="7" class="empty">Nessuna importazione ancora.</td></tr>{% endfor %}</table></div>
+</section>
+{% endblock %}

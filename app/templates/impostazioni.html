@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block title %}Impostazioni{% endblock %}{% block body %}
+{% include "_impostazioni_tabs.html" %}
+<div class="grid g2">
+<div class="card"><h3>Profilo</h3>
+<p class="meta">Come compari nelle schede, nelle firme e nelle mail. Utente: <span class="mono">{{ user.username }}</span>.</p>
+<form method="post" action="/impostazioni/profilo"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<div class="row" style="align-items:flex-end;flex-wrap:nowrap">
+<div style="flex:0 0 110px"><label for="title">Titolo</label><select id="title" name="title">{% for t in TITLES %}<option value="{{ t }}" {{ 'selected' if t == prof.title }}>{{ t or '-' }}</option>{% endfor %}</select></div>
+<div style="flex:1"><label for="first_name">Nome</label><input id="first_name" name="first_name" value="{{ prof.first_name }}" maxlength="80" required></div>
+<div style="flex:1"><label for="last_name">Cognome</label><input id="last_name" name="last_name" value="{{ prof.last_name }}" maxlength="80" required></div></div>
+<label for="qualifica">{{ 'Tipo di medico / specialità' if user.role == 'medico' else 'Ruolo' }}</label>
+<input id="qualifica" name="qualifica" value="{{ prof.qualifica }}" maxlength="80" placeholder="{{ 'es. Medicina interna' if user.role == 'medico' else 'es. Accettazione e trasporti' }}">
+<label for="struttura">Dove lavora</label><input id="struttura" name="struttura" value="{{ prof.struttura }}" maxlength="80" placeholder="es. Ospedale Laguna">
+<label for="reparto">Reparto o servizio</label><input id="reparto" name="reparto" value="{{ prof.reparto }}" maxlength="80" placeholder="es. Centrale Operativa Territoriale">
+<p><button>Salva il profilo</button></p></form></div>
+<div class="card" id="aspetto"><h3>Aspetto</h3>
+<p class="meta">Vale solo per te, su ogni computer da cui entri.</p>
+<form method="post" action="/impostazioni/tema"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<fieldset><legend>Tema</legend>{% for k, l in THEMES.items() %}<label><input type="radio" name="theme" value="{{ k }}" {{ 'checked' if (user.theme or 'auto') == k }}> {{ l }}</label>{% endfor %}</fieldset>
+<p><button>Applica</button></p></form></div>
+</div>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% block title %}Calendario{% endblock %}{% block body %}
+<header class="pagehead"><div><h1>Calendario</h1>
+<p class="sub">Tutte le agende, una settimana alla volta. Per disdire o spostare una visita apri la persona: le azioni stanno nel suo calendario.
+<span class="prova" title="{{ totale }} posti, {{ prova }} sintetici">DATI DI PROVA</span></p></div></header>
+
+<nav class="tabs cal-esami" aria-label="Agenda">{% for e in esami %}<a href="?esame={{ e|urlencode }}&dal={{ giorni[0].isoformat() }}" class="{{ 'on' if e == esame }}">{{ e.replace('_', ' ') }}</a>{% endfor %}</nav>
+
+<div class="cal-settimana">
+  <a class="btn ghost" href="?esame={{ esame|urlencode }}&dal={{ prima }}" aria-label="Settimana prima">&larr;</a>
+  <b>{{ giorni[0].day }}/{{ giorni[0].month }} – {{ giorni[-1].day }}/{{ giorni[-1].month }}</b>
+  <a class="btn ghost" href="?esame={{ esame|urlencode }}&dal={{ dopo }}" aria-label="Settimana dopo">&rarr;</a>
+  <a class="btn ghost" href="?esame={{ esame|urlencode }}">Oggi</a>
+  <span class="cal-legenda"><i class="l-libero"></i>libero <i class="l-tenuto"></i>tenuto <i class="l-persona"></i>persona in Filo <i class="l-pieno"></i>occupato</span>
+</div>
+
+<div class="cal-giorni">
+{% for c in colonne %}{% if c.voci %}<section class="cal-giorno{{ ' oggi' if c.g.isoformat() == TODAY }}">
+  <header><b>{{ ['lun','mar','mer','gio','ven','sab','dom'][c.g.weekday()] }} {{ c.g.day }}/{{ c.g.month }}</b>
+  <span class="meta">{{ c.liberi }} {{ 'libero' if c.liberi == 1 else 'liberi' }}</span></header>
+  {% for v in c.voci %}
+  {% if v.tipo == 'pieno' %}<div class="slot pieno">{{ v.dal }}{% if v.al != v.dal %}–{{ v.al }}{% endif %} · {{ v.n }} {{ 'occupato' if v.n == 1 else 'occupati' }}</div>
+  {% elif v.x.patient_id %}<a class="slot persona" href="/persona/{{ v.x.patient_id }}/calendario"><span class="mono">{{ v.ora }}</span> {{ v.x.patient }}{% if v.tipo == 'tenuto' %} <small>(da confermare)</small>{% endif %}</a>
+  {% elif v.tipo == 'libero' %}<div class="slot libero"><span class="mono">{{ v.ora }}</span> libero</div>
+  {% elif v.tipo == 'tenuto' %}<div class="slot tenuto"><span class="mono">{{ v.ora }}</span> tenuto</div>
+  {% else %}<div class="slot bloccato"><span class="mono">{{ v.ora }}</span> chiuso</div>{% endif %}
+  {% endfor %}
+</section>{% endif %}{% endfor %}
+</div>
+
+<div class="grid g2" style="margin-top:20px">
+<div class="card"><h3>Prossimi posti liberi · {{ esame.replace('_', ' ') }}</h3>
+{% for x in liberi %}<div class="riga"><span class="mono">{{ x.at[8:10] }}/{{ x.at[5:7] }} {{ x.at[11:16] }}</span><span class="meta">{{ x.place }}</span></div>
+{% else %}<p class="meta">Nessun posto libero: chi ne ha bisogno va in lista d'attesa.</p>{% endfor %}
+<details style="margin-top:12px"><summary class="small">Chiudi un posto (ambulatorio non disponibile)</summary>
+<form method="post" action="/calendario/blocca" class="stack" style="gap:8px;margin-top:8px"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<select name="posto">{% for h in orari %}{% for g in giorni %}{% set x = griglia.get((g.isoformat(), h)) %}{% if x and x.status != 'bloccato' %}<option value="{{ x.id }}">{{ x.at }}{% if x.patient %} · {{ x.patient }}{% endif %}</option>{% endif %}{% endfor %}{% endfor %}</select>
+<input name="motivo" placeholder="Motivo" maxlength="300"><button class="danger">Chiudi il posto</button>
+<p class="small">Se nel posto c'è una persona, Filo propone lo spostamento e chiede la conferma prima di chiuderlo.</p></form></details></div>
+<div class="card"><h3>Modifiche alle prenotazioni <span class="count">{{ mods|length }}</span></h3>
+{% for m in mods %}<div class="riga"><span><b>{{ m.patient }}</b><br><span class="meta">{{ m.cosa }} · {{ m.motivo }}</span></span><span class="meta">{{ m.stato }}</span></div>
+{% if m.status == 'in_chiamata' %}<div class="row" style="margin:4px 0 8px"><a class="btn ghost" href="/chiamate/{{ m.call_id }}">Apri la chiamata</a>
+<form method="post" action="/calendario/modifiche/{{ m.id }}/esito" class="row"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<select name="scelta"><option value="accetta">Ha confermato</option><option value="rifiuta">Non ha confermato</option><option value="nessuna_risposta">Non ha risposto</option></select>
+<button class="ghost">Registra l'esito</button></form></div>{% endif %}
+{% if m.status == 'errore' %}<div class="row" style="margin:4px 0 8px"><form method="post" action="/calendario/modifiche/{{ m.id }}/riprova"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="ghost">Riprova ad applicare</button></form>
+<form method="post" action="/calendario/modifiche/{{ m.id }}/ritira"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="danger">Ritira</button></form></div>{% endif %}
+{% else %}<p class="meta">Nessuna modifica in corso. Si propone dal calendario della persona.</p>{% endfor %}</div>
+</div>
+<details class="card" style="margin-top:16px"><summary>Ultime operazioni sul calendario ({{ log|length }})</summary>
+{% for l in log %}<div class="ev{{ ' al' if l.esito not in ('ok', 'verificata') else '' }}"><div class="meta">{{ l.ts[11:16] }} · {{ l.op }} · {{ l.esito }} · {{ l.who }}</div><div class="small">{{ l.text }}</div></div>{% endfor %}</details>
+{% endblock %}
